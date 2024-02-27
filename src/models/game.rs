@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SteamGame {
+pub struct Game {
     pub app_id: u32,
     pub name: String,
     pub genres: Vec<String>,
