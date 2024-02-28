@@ -250,20 +250,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ratesum"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "serde",
- "serde-inline-default",
- "serde_json",
- "strsim",
- "thiserror",
- "toml",
- "ureq",
-]
-
-[[package]]
 name = "ring"
 version = "0.17.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -276,6 +262,20 @@ dependencies = [
  "spin",
  "untrusted",
  "windows-sys",
+]
+
+[[package]]
+name = "rusteam"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde-inline-default",
+ "serde_json",
+ "strsim",
+ "thiserror",
+ "toml",
+ "ureq",
 ]
 
 [[package]]
