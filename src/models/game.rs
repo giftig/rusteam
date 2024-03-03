@@ -17,6 +17,11 @@ pub struct Game {
 pub struct OwnedGame {
     pub app_id: u32,
     pub purchased: DateTime<Utc>,
-    pub last_played: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PlayedGame {
+    pub app_id: u32,
     pub playtime: Duration,
+    pub recorded: DateTime<Utc>,
 }

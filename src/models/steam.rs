@@ -17,3 +17,19 @@ pub struct SteamOwnedGames {
 pub struct SteamOwnedGamesResponse {
     pub response: SteamOwnedGames,
 }
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct SteamAllGamesResponse {
+    pub applist: SteamApplist,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct SteamApplist {
+    pub apps: Vec<SteamAppIdPair>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct SteamAppIdPair {
+    pub appid: u32,
+    pub name: String
+}
