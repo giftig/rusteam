@@ -1,4 +1,5 @@
 mod db;
+pub mod config;
 pub mod models;
 pub mod steam;
 
@@ -46,8 +47,9 @@ async fn migrate_db(db_client: &mut DbClient) -> () {
 
 #[tokio::main]
 async fn main() {
-    // FIXME: config
-    let (mut db_client, conn) = tokio_postgres::connect("host=localhost user=admin password=admin dbname=rusteam", NoTls).await.unwrap();
+    let conf = config::read();
+
+    let (mut db_client, conn) = tokio_postgres::connect(&conf.db.connection_string(), NoTls).await.unwrap();
     tokio::spawn(async move {
         if let Err(e) = conn.await {
             panic!("connection error: {}", e);
@@ -56,12 +58,9 @@ async fn main() {
 
     migrate_db(&mut db_client).await;
 
-    let api_key = env::var("STEAM_API_KEY").unwrap();
-    let user_id = env::var("STEAM_USER_ID").unwrap();
-
     let repo = Repo::new(db_client);
-    let steam_client = SteamClient::new(&api_key);
-    let sync = Sync::new(&user_id, repo, steam_client);
+    let steam_client = SteamClient::new(&conf.steam.api_key);
+    let sync = Sync::new(&conf.steam.user_id, repo, steam_client);
 
     sync.sync_steam().await.unwrap();
 }
