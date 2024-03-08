@@ -31,8 +31,8 @@ async fn query_notion() -> () {
 }
 
 // Run migrations or panic
-async fn migrate_db(db_client: &mut PgClient) -> () {
-    match migrations::run(&mut db_client).await {
+async fn migrate_db(db_client: &mut DbClient) -> () {
+    match migrations::run(db_client).await {
         Ok(report) => {
             let count = report.applied_migrations().len();
             println!("Successfully ran {} migrations.", count);
@@ -54,7 +54,7 @@ async fn main() {
         }
     });
 
-    migrate_db(&mut db_client);
+    migrate_db(&mut db_client).await;
 
     let api_key = env::var("STEAM_API_KEY").unwrap();
     let user_id = env::var("STEAM_USER_ID").unwrap();

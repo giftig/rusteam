@@ -1,8 +1,7 @@
-use chrono::Utc;
 use thiserror::Error;
 use ureq;
 
-use crate::models::game::OwnedGame;
+use crate::models::game::GameId;
 use crate::models::steam::*;
 
 #[derive(Error, Debug)]
@@ -16,7 +15,7 @@ pub enum SteamError {
 pub type Result<T> = std::result::Result<T, SteamError>;
 
 pub trait SteamPlayerServiceHandling {
-    fn get_owned_games(&self, account_id: &str) -> Result<Vec<OwnedGame>>;
+    fn get_owned_games(&self, account_id: &str) -> Result<Vec<GameId>>;
 }
 
 pub trait SteamAppsServiceHandling {
@@ -35,21 +34,18 @@ impl SteamClient {
 
 impl SteamPlayerServiceHandling for SteamClient {
 
-    fn get_owned_games(&self, account_id: &str) -> Result<Vec<OwnedGame>> {
+    fn get_owned_games(&self, account_id: &str) -> Result<Vec<GameId>> {
         let req = ureq::get("https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/")
             .query("key", &self.api_key)
             .query("steamid", &account_id);
 
-        let now = Utc::now();
         let res = req.call()?.into_json::<SteamOwnedGamesResponse>()?;
         Ok(
             res
                 .response
                 .games
                 .into_iter()
-                // FIXME: I may need to either rename this field or get the real info from
-                // somewhere. For now I'll just use the scrape time as purchased time
-                .map(|g| OwnedGame { app_id: g.appid, purchased: now.clone() })
+                .map(|g| g.appid.into())
                 .collect()
         )
     }
