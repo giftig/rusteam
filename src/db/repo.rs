@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::num::TryFromIntError;
+use std::time::Duration;
 
-use chrono::{NaiveDateTime, Utc};
+use chrono::Utc;
 use thiserror::Error;
 use tokio_postgres::{Client, Error as PgError};
 
-use crate::models::game::GameId;
+use crate::models::game::{GameId, PlayedGame};
 
 #[derive(Error, Debug)]
 pub enum RepoError {
@@ -38,11 +39,32 @@ impl Repo {
         Ok(app_ids - &known)
     }
 
-    async fn get_owned_games_last_updated(&self) -> Result<Option<NaiveDateTime>> {
-        let q = "SELECT purchased FROM owned_game ORDER BY purchased DESC LIMIT 1";
-        let res = self.db.query(q, &[]).await?;
+    async fn get_latest_played_game_updates(&self) -> Result<HashMap<GameId, Duration>> {
+        // Need to cast the playtime interval because of lack of INTERVAL support in the client lib
+        // https://github.com/sfackler/rust-postgres/issues/60
+        // TODO: either migrate the type in postgres or implement ToSql / FromSql for INTERVAL
+        let q = r#"
+            SELECT DISTINCT ON (app_id)
+                app_id, EXTRACT(epoch FROM playtime)::BIGINT
+            FROM played_game
+            ORDER BY app_id, playtime DESC
+        "#;
 
-        Ok(res.first().map(|row| row.get(0)))
+        Ok(
+            self.db
+                .query(q, &[])
+                .await?
+                .into_iter()
+                .map(|row| {
+                    let id: GameId = GameId::from(row.get::<usize, i64>(0));
+                    let playtime: Duration = Duration::from_secs(
+                        row.get::<usize, i64>(1).try_into().unwrap()
+                    );
+
+                    (id, playtime)
+                })
+                .collect()
+        )
     }
 }
 
@@ -52,6 +74,10 @@ pub trait SteamGamesHandling {
 
 pub trait OwnedGamesHandling {
     async fn insert_owned_games(&self, games: &[GameId]) -> Result<()>;
+}
+
+pub trait PlayedGamesHandling {
+    async fn insert_played_game_updates(&self, updates: &[PlayedGame]) -> Result<u64>;
 }
 
 impl SteamGamesHandling for Repo {
@@ -93,5 +119,45 @@ impl OwnedGamesHandling for Repo {
 
         println!("Inserted {} new owned games into owned_game table", row_count);
         Ok(())
+    }
+}
+
+impl PlayedGamesHandling for Repo {
+    async fn insert_played_game_updates(&self, updates: &[PlayedGame]) -> Result<u64> {
+        let latest_updates = self.get_latest_played_game_updates().await?;
+        let q = r#"
+            INSERT INTO played_game(app_id, playtime, last_played, recorded)
+            VALUES($1, ($2::TEXT || ' secs')::INTERVAL, $3, $4)
+        "#;
+
+        let mut update_count: u64 = 0;
+
+        println!("Inserting playtime updates into played_game table");
+        for update in updates {
+            let should_update = latest_updates
+                .get(&update.id)
+                .filter(|&u| *u >= update.playtime)
+                .map(|_| false)
+                .unwrap_or(true);
+
+            if !should_update {
+                continue;
+            }
+            let id: &i64 = &update.id.into();
+            let playtime_secs: String = update.playtime.as_secs().to_string();
+
+            update_count += self.db.execute(
+                q,
+                &[
+                    id,
+                    &playtime_secs,
+                    &update.last_played.naive_utc(),
+                    &update.recorded.naive_utc()
+                ]
+            ).await?;
+        }
+        println!("Inserted {} recent updates into played_game table", update_count);
+
+        Ok(update_count)
     }
 }

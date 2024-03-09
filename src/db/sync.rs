@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
+use chrono::Utc;
 use thiserror::Error;
 
-use crate::db::repo::{Repo, RepoError, OwnedGamesHandling, SteamGamesHandling};
-use crate::steam::{SteamClient, SteamError, SteamAppsServiceHandling, SteamPlayerServiceHandling};
+use crate::db::repo::*;
+use crate::models::game::PlayedGame;
+use crate::steam::*;
 
 #[derive(Error, Debug)]
 pub enum SyncError {
@@ -46,9 +48,32 @@ impl Sync {
         Ok(())
     }
 
+    async fn sync_played_games(&self) -> Result<()> {
+        let playtime_steam = self.steam.get_played_games(&self.steam_account_id)?;
+        let now = Utc::now();
+
+        // Current playtime for all owned games, according to steam
+        let played_games: Vec<PlayedGame> = playtime_steam
+            .into_iter()
+            .map(
+                |p| PlayedGame {
+                    id: p.id,
+                    playtime: p.playtime,
+                    last_played: p.last_played,
+                    recorded: now.clone(),
+                }
+            )
+            .collect();
+
+        self.repo.insert_played_game_updates(&played_games).await?;
+
+        Ok(())
+    }
+
     pub async fn sync_steam(&self) -> Result<()> {
         self.sync_steam_games().await?;
         self.sync_owned_games().await?;
+        self.sync_played_games().await?;
         Ok(())
     }
 }

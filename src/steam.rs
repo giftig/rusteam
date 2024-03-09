@@ -1,7 +1,10 @@
+use std::time::Duration;
+
+use chrono::{DateTime, Utc};
 use thiserror::Error;
 use ureq;
 
-use crate::models::game::GameId;
+use crate::models::game::{GameId, SteamPlaytime};
 use crate::models::steam::*;
 
 #[derive(Error, Debug)]
@@ -16,6 +19,7 @@ pub type Result<T> = std::result::Result<T, SteamError>;
 
 pub trait SteamPlayerServiceHandling {
     fn get_owned_games(&self, account_id: &str) -> Result<Vec<GameId>>;
+    fn get_played_games(&self, account_id: &str) -> Result<Vec<SteamPlaytime>>;
 }
 
 pub trait SteamAppsServiceHandling {
@@ -30,22 +34,41 @@ impl SteamClient {
     pub fn new(api_key: &str) -> SteamClient {
         SteamClient { api_key: api_key.to_string() }
     }
-}
 
-impl SteamPlayerServiceHandling for SteamClient {
-
-    fn get_owned_games(&self, account_id: &str) -> Result<Vec<GameId>> {
+    fn get_owned_games_internal(&self, account_id: &str) -> Result<SteamOwnedGamesResponse> {
         let req = ureq::get("https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/")
             .query("key", &self.api_key)
             .query("steamid", &account_id);
 
-        let res = req.call()?.into_json::<SteamOwnedGamesResponse>()?;
+        Ok(req.call()?.into_json::<SteamOwnedGamesResponse>()?)
+    }
+}
+
+impl SteamPlayerServiceHandling for SteamClient {
+    fn get_owned_games(&self, account_id: &str) -> Result<Vec<GameId>> {
         Ok(
-            res
+            self.get_owned_games_internal(account_id)?
                 .response
                 .games
                 .into_iter()
                 .map(|g| g.appid.into())
+                .collect()
+        )
+    }
+
+    fn get_played_games(&self, account_id: &str) -> Result<Vec<SteamPlaytime>> {
+        Ok(
+            self.get_owned_games_internal(account_id)?
+                .response
+                .games
+                .into_iter()
+                .map(|g| {
+                    SteamPlaytime {
+                        id: g.appid.into(),
+                        playtime: Duration::new(g.playtime_forever * 60, 0),
+                        last_played: DateTime::from_timestamp(g.rtime_last_played.try_into().unwrap(), 0).unwrap_or(Utc::now()),
+                    }
+                })
                 .collect()
         )
     }
