@@ -1,35 +1,18 @@
 mod db;
 pub mod config;
 pub mod models;
+pub mod notion;
 pub mod steam;
 
-use std::env;
-use std::str::FromStr;
-
-use notion::NotionApi;
-use notion::ids::DatabaseId;
-use notion::models::search::DatabaseQuery;
+use ::notion::NotionApi;
 use tokio;
 use tokio_postgres::{Client as DbClient, NoTls};
 
 use crate::db::migrations;
 use crate::db::repo::Repo;
 use crate::db::sync::Sync;
+use crate::notion::NotionGamesRepo;
 use crate::steam::SteamClient;
-
-async fn query_notion() -> () {
-    let api_key = env::var("NOTION_API_KEY").unwrap();
-    let db_id = env::var("NOTION_DATABASE_ID").unwrap();
-
-    let notion = NotionApi::new(api_key).unwrap();
-    let res = notion
-        .query_database(DatabaseId::from_str(&db_id).unwrap(), DatabaseQuery {sorts: None, filter: None, paging: None})
-        .await
-        .unwrap()
-        .results;
-
-    println!("{:?}", &res);
-}
 
 // Run migrations or panic
 async fn migrate_db(db_client: &mut DbClient) -> () {
@@ -60,7 +43,12 @@ async fn main() {
 
     let repo = Repo::new(db_client);
     let steam_client = SteamClient::new(&conf.steam.api_key);
-    let sync = Sync::new(&conf.steam.user_id, repo, steam_client);
+    let notion = NotionGamesRepo::new(
+        NotionApi::new(conf.notion.api_key.clone()).unwrap(),
+        &conf.notion.database_id
+    );
+    let sync = Sync::new(&conf.steam.user_id, repo, steam_client, notion);
 
     sync.sync_steam().await.unwrap();
+    sync.sync_notion().await.unwrap();
 }

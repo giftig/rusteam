@@ -4,10 +4,17 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 #[derive(Copy, Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct GameId {
     pub app_id: u32
+}
+
+#[derive(Debug, Error)]
+pub enum InvalidGameId {
+    #[error("Could not convert string to u32")]
+    FromString,
 }
 
 impl From<u32> for GameId {
@@ -18,6 +25,13 @@ impl From<u32> for GameId {
 impl From<i64> for GameId {
     fn from(i: i64) -> Self {
         GameId { app_id: i.try_into().unwrap() }
+    }
+}
+impl TryFrom<&str> for GameId {
+    type Error = InvalidGameId;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        Ok(GameId { app_id: s.parse::<u32>().map_err(|_| Self::Error::FromString)? })
     }
 }
 impl Into<String> for GameId {
@@ -35,11 +49,10 @@ impl Into<i64> for GameId {
 pub struct NotedGame {
     #[serde(flatten)]
     pub id: GameId,
-    pub name: String,
-    pub genres: Vec<String>,
     pub tags: Vec<String>,
     pub my_rating: Option<u8>,
-    pub release_date: Option<DateTime<Utc>>,
+    pub notes: Option<String>,
+    pub first_noted: DateTime<Utc>,
 }
 
 // Represents a cleaner / simplified version of SteamOwnedGame to hold playtime details

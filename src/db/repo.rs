@@ -6,7 +6,7 @@ use chrono::Utc;
 use thiserror::Error;
 use tokio_postgres::{Client, Error as PgError};
 
-use crate::models::game::{GameId, PlayedGame};
+use crate::models::game::{GameId, NotedGame, PlayedGame};
 
 #[derive(Error, Debug)]
 pub enum RepoError {
@@ -78,6 +78,10 @@ pub trait OwnedGamesHandling {
 
 pub trait PlayedGamesHandling {
     async fn insert_played_game_updates(&self, updates: &[PlayedGame]) -> Result<u64>;
+}
+
+pub trait NotedGamesHandling {
+    async fn insert_noted_games(&self, notes: &[NotedGame]) -> Result<()>;
 }
 
 impl SteamGamesHandling for Repo {
@@ -159,5 +163,35 @@ impl PlayedGamesHandling for Repo {
         println!("Inserted {} recent updates into played_game table", update_count);
 
         Ok(update_count)
+    }
+}
+
+
+impl NotedGamesHandling for Repo {
+    async fn insert_noted_games(&self, notes: &[NotedGame]) -> Result<()> {
+        let q = r#"
+            INSERT INTO noted_game (app_id, first_noted, my_rating, notes)
+            VALUES($1, $2, $3, $4)
+            ON CONFLICT (app_id) DO UPDATE
+                SET my_rating = excluded.my_rating,
+                    notes = excluded.notes
+        "#;
+
+        println!("Inserting {} game notes into noted_game table", notes.len());
+
+        for n in notes {
+            self.db
+                .execute(
+                    q,
+                    &[
+                        &i64::from(n.id.app_id),
+                        &n.first_noted.naive_utc(),
+                        &n.my_rating.map(i16::from),
+                        &n.notes
+                    ]
+                )
+                .await?;
+        }
+        Ok(())
     }
 }
