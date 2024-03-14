@@ -35,7 +35,7 @@ impl NotionGamesRepo {
                 .await?
                 .results
                 .into_iter()
-                .filter_map(|page| match GameNote::try_from(page.properties) {
+                .filter_map(|page| match GameNote::try_from(page) {
                     Ok(note) => Some(note),
                     Err(e) => {
                         eprintln!("Skipping unparseable notion row. Error: {:?}", e);

@@ -49,6 +49,6 @@ async fn main() {
     );
     let sync = Sync::new(&conf.steam.user_id, repo, steam_client, notion);
 
-    sync.sync_steam().await.unwrap();
+//    sync.sync_steam().await.unwrap();
     sync.sync_notion().await.unwrap();
 }

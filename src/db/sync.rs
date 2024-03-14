@@ -4,7 +4,7 @@ use chrono::Utc;
 use thiserror::Error;
 
 use crate::db::repo::*;
-use crate::models::game::{NotedGame, PlayedGame};
+use crate::models::game::{GameId, NotedGame, PlayedGame};
 use crate::notion::{NotionError, NotionGamesRepo};
 use crate::steam::*;
 
@@ -93,12 +93,28 @@ impl Sync {
     pub async fn sync_notion(&self) -> Result<()> {
         let notes = self.notion.get_notes().await?;
 
+        let names_missing_app_ids: Vec<String> = notes
+            .iter()
+            .filter_map(|n| if n.app_id.is_none() { n.name.clone() } else { None })
+            .collect();
+
+        let app_ids = self.repo.get_appids_by_name(&names_missing_app_ids).await?;
+
         let noted_games: Vec<NotedGame> = notes
             .iter()
             .filter_map(|n| {
+                // Get the app ID from notion if it's already present and can be parsed, and fall
+                // back on app_ids found in the db by name otherwise.
+                let app_id: Option<GameId> = n
+                    .app_id
+                    .clone()
+                    .and_then(|id| id.as_str().try_into().ok())
+                    .or(n.name.clone().and_then(|name| app_ids.get(&name)).copied());
+
                 Some(
                     NotedGame {
-                        id: n.app_id.clone()?.as_str().try_into().ok()?,
+                        note_id: n.id.clone(),
+                        app_id: app_id,
                         tags: n.tags.clone().into_iter().map(|t| t.0).collect(),
                         my_rating: n.rating,
                         notes: n.notes.clone(),
@@ -111,6 +127,7 @@ impl Sync {
         // TODO: Populate game tags in postgres
         // TODO: Look up app ids by name and insert them back into the notion db
         // TODO: The above, but also use strsim to handle non-exact matches
+        // N.B. Postgres can do levenshtein directly, just need CREATE EXTENSION IF NOT EXISTS fuzzystrmatch
 
         self.repo.insert_noted_games(&noted_games).await?;
         Ok(())

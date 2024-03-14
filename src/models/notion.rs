@@ -1,7 +1,8 @@
 use std::convert::identity;
 
 use chrono::{DateTime, Utc};
-use notion::models::Properties;
+use notion::ids::Identifier;
+use notion::models::Page;
 use notion::models::properties::PropertyValue;
 use notion::models::text::RichText;
 use thiserror::Error;
@@ -70,6 +71,7 @@ pub struct GameTag(pub String);
 //   - we don't model every field, and don't want to require a code change here to add new fields
 #[derive(Debug)]
 pub struct GameNote {
+    pub id: String,
     pub name: Option<String>,
     pub app_id: Option<String>,
     pub state: Option<GameState>,
@@ -99,6 +101,15 @@ fn extract_text(value: &PropertyValue) -> Option<String> {
 fn extract_title(value: &PropertyValue) -> Option<String> {
     match value {
         PropertyValue::Title { title, .. } => accumulate_plaintext(title),
+        _ => None
+    }
+}
+
+fn extract_rating(value: &PropertyValue) -> Option<u8> {
+    match value {
+        PropertyValue::Number { number, .. } => {
+            number.clone().and_then(|n| n.as_u64()).and_then(|n| u8::try_from(n).ok())
+        }
         _ => None
     }
 }
@@ -138,14 +149,15 @@ fn extract_created_time(value: &PropertyValue) -> Result<DateTime<Utc>> {
     }
 }
 
-impl TryFrom<Properties> for GameNote {
+impl TryFrom<Page> for GameNote {
     type Error = ExtractError;
 
-    fn try_from(props: Properties) -> Result<Self> {
-        let p = props.properties;
+    fn try_from(page: Page) -> Result<Self> {
+        let p = page.properties.properties;
 
         Ok(
             GameNote {
+                id: page.id.value().to_string(),
                 name: p.get("Name").and_then(extract_title),
                 app_id: p.get("Steam ID").and_then(extract_text),
                 state: p.get("State")
@@ -154,9 +166,7 @@ impl TryFrom<Properties> for GameNote {
                     .and_then(identity)?,
                 tags: p.get("Tags").map(extract_tags).unwrap_or(vec![]),
                 notes: p.get("Notes").and_then(extract_text),
-                rating: p.get("Rating")
-                    .and_then(extract_text)
-                    .and_then(|s| s.parse::<u8>().ok()),
+                rating: p.get("Rating").and_then(extract_rating),
                 created_time: p
                     .get("Created time")
                     .map(extract_created_time)

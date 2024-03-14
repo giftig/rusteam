@@ -82,6 +82,7 @@ pub trait PlayedGamesHandling {
 
 pub trait NotedGamesHandling {
     async fn insert_noted_games(&self, notes: &[NotedGame]) -> Result<()>;
+    async fn get_appids_by_name<T: AsRef<str>>(&self, names: &[T]) -> Result<HashMap<String, GameId>>;
 }
 
 impl SteamGamesHandling for Repo {
@@ -170,10 +171,11 @@ impl PlayedGamesHandling for Repo {
 impl NotedGamesHandling for Repo {
     async fn insert_noted_games(&self, notes: &[NotedGame]) -> Result<()> {
         let q = r#"
-            INSERT INTO noted_game (app_id, first_noted, my_rating, notes)
-            VALUES($1, $2, $3, $4)
-            ON CONFLICT (app_id) DO UPDATE
-                SET my_rating = excluded.my_rating,
+            INSERT INTO noted_game (note_id, app_id, first_noted, my_rating, notes)
+            VALUES($1, $2, $3, $4, $5)
+            ON CONFLICT (note_id) DO UPDATE
+                SET app_id = excluded.app_id,
+                    my_rating = excluded.my_rating,
                     notes = excluded.notes
         "#;
 
@@ -184,7 +186,8 @@ impl NotedGamesHandling for Repo {
                 .execute(
                     q,
                     &[
-                        &i64::from(n.id.app_id),
+                        &n.note_id,
+                        &n.app_id.map(|id| i64::from(id.app_id)),
                         &n.first_noted.naive_utc(),
                         &n.my_rating.map(i16::from),
                         &n.notes
@@ -193,5 +196,18 @@ impl NotedGamesHandling for Repo {
                 .await?;
         }
         Ok(())
+    }
+
+    async fn get_appids_by_name<T: AsRef<str>>(&self, names: &[T]) -> Result<HashMap<String, GameId>> {
+        let q = "SELECT app_id, name FROM steam_game WHERE name = ANY ($1)";
+        let owned_names: Vec<String> = names.iter().map(|s| s.as_ref().to_string()).collect();
+
+        Ok(
+            self.db
+                .query(q, &[&owned_names]).await?
+                .into_iter()
+                .map(|row| (row.get(1), GameId::from(row.get::<usize, i64>(0))))
+                .collect()
+        )
     }
 }
