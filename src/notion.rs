@@ -1,16 +1,24 @@
-use crate::models::notion::GameNote;
+mod conv;
 
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use ::notion::NotionApi;
 use ::notion::ids::DatabaseId;
+use ::notion::models::Properties;
+use ::notion::models::properties::PropertyValue;
 use ::notion::models::search::DatabaseQuery;
 use thiserror::Error;
+use ureq;
+
+use crate::models::notion::{GameNote, UpdatePage};
 
 #[derive(Debug, Error)]
 pub enum NotionError {
     #[error("An error occurred while contacting Notion: {0}")]
     Api(#[from] notion::Error),
+    #[error("An http error occurred fetching data from Notion via ureq: {0}")]
+    Http(#[from] ureq::Error),
     #[error("Format error: {0}")]
     Fmt(#[from] std::fmt::Error),
 }
@@ -18,12 +26,17 @@ pub type Result<T> = std::result::Result<T, NotionError>;
 
 pub struct NotionGamesRepo {
     api: NotionApi,
-    database_id: String
+    database_id: String,
+    api_key: String
 }
 
 impl NotionGamesRepo {
-    pub fn new(api: NotionApi, database_id: &str) -> NotionGamesRepo {
-        NotionGamesRepo { api: api, database_id: database_id.to_string() }
+    pub fn new(api_key: &str, database_id: &str) -> NotionGamesRepo {
+        NotionGamesRepo {
+            api: NotionApi::new(api_key.to_string()).unwrap(),
+            database_id: database_id.to_string(),
+            api_key: api_key.to_string()
+        }
     }
 
     pub async fn get_notes(&self) -> Result<Vec<GameNote>> {
@@ -44,5 +57,28 @@ impl NotionGamesRepo {
                 })
                 .collect()
         )
+    }
+
+    // Construct a basic Notion Text property from string
+
+    pub fn set_game_details(&self, note_id: &str, app_id: &str, name: &str) -> Result<()> {
+        println!("Setting details in notion for game {}: {}", app_id, name);
+
+        let props: HashMap<String, PropertyValue> = HashMap::from([
+            ("Steam ID".to_string(), conv::to_text(app_id)),
+            ("Name".to_string(), conv::to_title(name)),
+        ]);
+
+        let body = UpdatePage { properties: Properties { properties: props } };
+
+        // Notion crate doesn't support this operation so we'll do it directly with ureq
+        let url = format!("https://api.notion.com/v1/pages/{}", note_id);
+        ureq::patch(&url)
+            .set("Authorization", &format!("Bearer {}", self.api_key))
+            .set("Content-Type", "application/json")
+            .set("Notion-Version", "2022-06-28")
+            .send_json(&body)?;
+
+        Ok(())
     }
 }

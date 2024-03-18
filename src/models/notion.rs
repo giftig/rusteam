@@ -2,9 +2,10 @@ use std::convert::identity;
 
 use chrono::{DateTime, Utc};
 use notion::ids::Identifier;
-use notion::models::Page;
+use notion::models::{Page, Properties};
 use notion::models::properties::PropertyValue;
 use notion::models::text::RichText;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -79,6 +80,14 @@ pub struct GameNote {
     pub notes: Option<String>,
     pub rating: Option<u8>,
     pub created_time: DateTime<Utc>
+}
+
+// Update a notion page by providing Properties. Properties is a wrapper belonging to the notion
+// crate, but it doesn't support updates. It does, however, model notion types and provide serde
+// for them. Wrap properties in a request wrapper to allow updating page properties over http(s)
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UpdatePage {
+    pub properties: Properties,
 }
 
 // Turn a Notion richtext field into a plain string by traversing the richtext elements

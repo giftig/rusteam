@@ -4,7 +4,6 @@ pub mod models;
 pub mod notion;
 pub mod steam;
 
-use ::notion::NotionApi;
 use tokio;
 use tokio_postgres::{Client as DbClient, NoTls};
 
@@ -43,12 +42,9 @@ async fn main() {
 
     let repo = Repo::new(db_client);
     let steam_client = SteamClient::new(&conf.steam.api_key);
-    let notion = NotionGamesRepo::new(
-        NotionApi::new(conf.notion.api_key.clone()).unwrap(),
-        &conf.notion.database_id
-    );
-    let sync = Sync::new(&conf.steam.user_id, repo, steam_client, notion);
+    let notion = NotionGamesRepo::new(&conf.notion.api_key, &conf.notion.database_id);
 
-//    sync.sync_steam().await.unwrap();
+    let sync = Sync::new(&conf.steam.user_id, repo, steam_client, notion);
+    sync.sync_steam().await.unwrap();
     sync.sync_notion().await.unwrap();
 }
