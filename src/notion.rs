@@ -59,8 +59,6 @@ impl NotionGamesRepo {
         )
     }
 
-    // Construct a basic Notion Text property from string
-
     pub fn set_game_details(&self, note_id: &str, app_id: &str, name: &str) -> Result<()> {
         println!("Setting details in notion for game {}: {}", app_id, name);
 

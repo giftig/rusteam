@@ -5,6 +5,7 @@ use thiserror::Error;
 
 use crate::db::repo::*;
 use crate::models::game::{GameId, NotedGame, PlayedGame};
+use crate::models::notion::GameNote;
 use crate::notion::{NotionError, NotionGamesRepo};
 use crate::steam::*;
 
@@ -90,19 +91,29 @@ impl Sync {
 }
 
 impl Sync {
-    // TODO: Break up this function a bit?
-    pub async fn sync_notion(&self) -> Result<()> {
-        let notes = self.notion.get_notes().await?;
+    fn write_app_ids_to_notion(
+        &self,
+        missing: &[(String, String)],
+        found: &HashMap<String, GameId>
+    ) -> Result<()> {
+        // Add app ids in notion for those we've newly discovered
+        for (id, name) in missing {
+            if let Some(&app_id) = found.get(name) {
+                let cast_app_id: String = app_id.into();
+                self.notion.set_game_details(&id, &cast_app_id, &name)?;
+            }
+        }
+        Ok(())
+    }
 
-        // Keep track of note ID + name of notes missing app IDs
-        let missing_app_ids: Vec<(String, String)> = notes
-            .iter()
-            .filter_map(|n| if n.app_id.is_none() { n.name.clone().map(|name| (n.id.clone(), name)) } else { None })
-            .collect();
-
-        let app_ids = self.repo.get_appids_by_name(&missing_app_ids.iter().map(|n| n.1.as_str()).collect::<Vec<&str>>()).await?;
-
-        let noted_games: Vec<NotedGame> = notes
+    // Turn GameNote records, representing the data in notion, into NotedGame records, a slightly
+    // different view of the data to store in postgres.
+    // Fill in app IDs we've derived from postgres if they're missing in the notion data.
+    fn derive_noted_games(
+        notes: &[GameNote],
+        app_ids: &HashMap<String, GameId>
+    ) -> Vec<NotedGame> {
+        notes
             .iter()
             .filter_map(|n| {
                 // Get the app ID from notion if it's already present and can be parsed, and fall
@@ -124,21 +135,38 @@ impl Sync {
                     }
                 )
             })
-            .collect();
+            .collect()
+    }
+
+    // Summarise IDs and names of games missing app IDs in notion results
+    fn missing_app_ids(notes: &[GameNote]) -> Vec<(String, String)> {
+        notes
+            .iter()
+            .filter_map(|n| {
+                if n.app_id.is_none() {
+                    n.name.clone().map(|name| (n.id.clone(), name))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub async fn sync_notion(&self) -> Result<()> {
+        let notes = self.notion.get_notes().await?;
+
+        let missing_app_ids = Self::missing_app_ids(&notes);
+        let names: Vec<&str> = missing_app_ids.iter().map(|n| n.1.as_str()).collect();
+        let found_app_ids = self.repo.get_appids_by_name(&names).await?;
+
+        let noted_games = Self::derive_noted_games(&notes, &found_app_ids);
+
+        self.repo.insert_noted_games(&noted_games).await?;
+        self.write_app_ids_to_notion(&missing_app_ids, &found_app_ids)?;
 
         // TODO: Populate game tags in postgres
         // Try using fuzzy matching to look up app ids by fuzzy name search
         // N.B. Postgres can do levenshtein directly, just need CREATE EXTENSION IF NOT EXISTS fuzzystrmatch
-
-        self.repo.insert_noted_games(&noted_games).await?;
-
-        // Add app ids in notion for those we've newly discovered
-        for (id, name) in missing_app_ids {
-            if let Some(&app_id) = app_ids.get(&name) {
-                let cast_app_id: String = app_id.into();
-                self.notion.set_game_details(&id, &cast_app_id, &name)?;
-            }
-        }
 
         Ok(())
     }
