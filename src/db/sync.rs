@@ -90,15 +90,17 @@ impl Sync {
 }
 
 impl Sync {
+    // TODO: Break up this function a bit?
     pub async fn sync_notion(&self) -> Result<()> {
         let notes = self.notion.get_notes().await?;
 
-        let names_missing_app_ids: Vec<String> = notes
+        // Keep track of note ID + name of notes missing app IDs
+        let missing_app_ids: Vec<(String, String)> = notes
             .iter()
-            .filter_map(|n| if n.app_id.is_none() { n.name.clone() } else { None })
+            .filter_map(|n| if n.app_id.is_none() { n.name.clone().map(|name| (n.id.clone(), name)) } else { None })
             .collect();
 
-        let app_ids = self.repo.get_appids_by_name(&names_missing_app_ids).await?;
+        let app_ids = self.repo.get_appids_by_name(&missing_app_ids.iter().map(|n| n.1.as_str()).collect::<Vec<&str>>()).await?;
 
         let noted_games: Vec<NotedGame> = notes
             .iter()
@@ -125,11 +127,19 @@ impl Sync {
             .collect();
 
         // TODO: Populate game tags in postgres
-        // TODO: Look up app ids by name and insert them back into the notion db
-        // TODO: The above, but also use strsim to handle non-exact matches
+        // Try using fuzzy matching to look up app ids by fuzzy name search
         // N.B. Postgres can do levenshtein directly, just need CREATE EXTENSION IF NOT EXISTS fuzzystrmatch
 
         self.repo.insert_noted_games(&noted_games).await?;
+
+        // Add app ids in notion for those we've newly discovered
+        for (id, name) in missing_app_ids {
+            if let Some(&app_id) = app_ids.get(&name) {
+                let cast_app_id: String = app_id.into();
+                self.notion.set_game_details(&id, &cast_app_id, &name)?;
+            }
+        }
+
         Ok(())
     }
 }
