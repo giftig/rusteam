@@ -47,7 +47,6 @@ impl Into<i64> for GameId {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NotedGame {
-    #[serde(flatten)]
     pub note_id: String,
     pub app_id: Option<GameId>,
     pub tags: Vec<String>,
