@@ -1,3 +1,8 @@
+#[cfg(test)]
+mod tests;
+
+use std::collections::HashMap;
+
 use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -32,4 +37,41 @@ pub struct SteamApplist {
 pub struct SteamAppIdPair {
     pub appid: u32,
     pub name: String
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(transparent)]
+pub struct SteamAppDetailsResponse {
+    pub results: HashMap<String, SteamAppDetailsResponseEntry>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct SteamAppDetailsResponseEntry {
+    pub data: SteamAppDetails,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct SteamAppDetails {
+    pub short_description: Option<String>,
+    pub controller_support: Option<String>,
+    pub categories: Vec<Category>,
+    pub metacritic: Option<MetacriticScore>,
+    pub release_date: Option<ReleaseDate>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct Category {
+    pub id: u32,
+    pub description: String
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ReleaseDate {
+    pub coming_soon: bool,
+    pub date: String
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct MetacriticScore {
+    pub score: u8
 }

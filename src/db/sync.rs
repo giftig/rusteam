@@ -21,6 +21,7 @@ pub enum SyncError {
 
 pub type Result<T> = std::result::Result<T, SyncError>;
 
+// TODO: Split into SteamSync + NotionSync and abstract over the top for better organisation
 pub struct Sync {
     steam_account_id: String,
     repo: Repo,
@@ -82,8 +83,28 @@ impl Sync {
         Ok(())
     }
 
+    async fn sync_game_details(&self) -> Result<()> {
+        let missing_games = self.repo.get_owned_games_missing_details().await?;
+        let noted_games = self.repo.get_noted_game_ids().await?;
+
+        println!(
+            "Reading game details from steam: {} missing / {} noted games",
+            &missing_games.len(),
+            &noted_games.len()
+        );
+
+        let refresh_ids: Vec<GameId> = {
+            missing_games.into_iter().chain(noted_games.into_iter()).collect()
+        };
+
+        let details = self.steam.get_game_details(&refresh_ids)?;
+        self.repo.insert_game_details(&details).await?;
+        Ok(())
+    }
+
     pub async fn sync_steam(&self) -> Result<()> {
         self.sync_steam_games().await?;
+        self.sync_game_details().await?;
         self.sync_owned_games().await?;
         self.sync_played_games().await?;
         Ok(())

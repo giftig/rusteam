@@ -47,7 +47,6 @@ impl Into<i64> for GameId {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NotedGame {
-    #[serde(flatten)]
     pub note_id: String,
     pub app_id: Option<GameId>,
     pub tags: Vec<String>,
@@ -69,9 +68,22 @@ pub struct SteamPlaytime {
 // Represents a record in the played_game table
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PlayedGame {
-    #[serde(flatten)]
     pub id: GameId,
     pub playtime: Duration,
     pub last_played: DateTime<Utc>,
+    pub recorded: DateTime<Utc>,
+}
+
+// Represents a record in the game_details table
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct GameDetails {
+    pub id: GameId,
+    pub description: Option<String>,
+    pub controller_support: Option<String>,
+    pub coop: bool,
+    pub local_coop: bool,
+    pub metacritic_percent: Option<u8>,
+    pub is_released: bool,
+    pub release_date: Option<String>,
     pub recorded: DateTime<Utc>,
 }

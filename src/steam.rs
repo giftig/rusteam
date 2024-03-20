@@ -1,10 +1,13 @@
+mod conv;
+
+use std::collections::HashMap;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use thiserror::Error;
 use ureq;
 
-use crate::models::game::{GameId, SteamPlaytime};
+use crate::models::game::{GameDetails, GameId, SteamPlaytime};
 use crate::models::steam::*;
 
 #[derive(Error, Debug)]
@@ -24,6 +27,10 @@ pub trait SteamPlayerServiceHandling {
 
 pub trait SteamAppsServiceHandling {
     fn get_all_games(&self) -> Result<Vec<SteamAppIdPair>>;
+}
+
+pub trait SteamAppDetailsHandling {
+    fn get_game_details(&self, ids: &[GameId]) -> Result<Vec<GameDetails>>;
 }
 
 pub struct SteamClient {
@@ -80,5 +87,57 @@ impl SteamAppsServiceHandling for SteamClient {
         let res = req.call()?.into_json::<SteamAllGamesResponse>()?;
 
         Ok(res.applist.apps)
+    }
+}
+
+impl SteamClient {
+    fn get_game_details_internal(&self, ids: &[GameId]) -> Result<HashMap<GameId, SteamAppDetails>> {
+        let mut results: HashMap<GameId, SteamAppDetailsResponseEntry> = HashMap::new();
+
+        // Requests have to be made one by one unless we're only getting price_overview
+        // TODO: This would be better done with an async http library rather than ureq
+        for &id in ids {
+            let appid: String = id.into();
+
+            let req = {
+                ureq::get("https://store.steampowered.com/api/appdetails")
+                    .query("currency", "GBP")
+                    .query("appids", &appid)
+            };
+
+            let res = {
+                match req.call()?.into_json::<SteamAppDetailsResponse>() {
+                    Ok(r) => r,
+                    Err(e) => {
+                        eprintln!("Bad JSON response from steam for appid {}: {}; skipping.", &appid, &e);
+                        continue;
+                    }
+                }
+            };
+
+            let details = {
+                res
+                    .results
+                    .into_iter()
+                    .map(|(k, v)| (GameId::try_from(k.as_ref()).unwrap(), v))
+            };
+
+            results.extend(details);
+        }
+
+        Ok(results.into_iter().map(|(k, v)| (k, v.data)).collect())
+    }
+}
+
+impl SteamAppDetailsHandling for SteamClient {
+    fn get_game_details(&self, ids: &[GameId]) -> Result<Vec<GameDetails>> {
+        let now = Utc::now();
+
+        Ok(
+            self.get_game_details_internal(ids)?
+                .into_iter()
+                .map(|(id, d)| conv::extract_game_details(&id, &d, &now))
+                .collect()
+        )
     }
 }
