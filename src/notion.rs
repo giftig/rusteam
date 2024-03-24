@@ -11,6 +11,7 @@ use ::notion::models::search::DatabaseQuery;
 use thiserror::Error;
 use ureq;
 
+use crate::models::game::GameState;
 use crate::models::notion::{GameNote, UpdatePage};
 
 #[derive(Debug, Error)]
@@ -59,14 +60,7 @@ impl NotionGamesRepo {
         )
     }
 
-    pub fn set_game_details(&self, note_id: &str, app_id: &str, name: &str) -> Result<()> {
-        println!("Setting details in notion for game {}: {}", app_id, name);
-
-        let props: HashMap<String, PropertyValue> = HashMap::from([
-            ("Steam ID".to_string(), conv::to_text(app_id)),
-            ("Name".to_string(), conv::to_title(name)),
-        ]);
-
+    fn update_row(&self, note_id: &str, props: HashMap<String, PropertyValue>) -> Result<()> {
         let body = UpdatePage { properties: Properties { properties: props } };
 
         // Notion crate doesn't support this operation so we'll do it directly with ureq
@@ -78,5 +72,27 @@ impl NotionGamesRepo {
             .send_json(&body)?;
 
         Ok(())
+    }
+
+    pub fn set_game_details(&self, note_id: &str, app_id: &str, name: &str) -> Result<()> {
+        println!("Setting details in notion for game {}: {}", app_id, name);
+
+        let props: HashMap<String, PropertyValue> = HashMap::from([
+            ("Steam ID".to_string(), conv::to_text(app_id)),
+            ("Name".to_string(), conv::to_title(name)),
+        ]);
+
+        Ok(self.update_row(note_id, props)?)
+    }
+
+    pub fn set_state(&self, note_id: &str, state: &GameState) -> Result<()> {
+        let new_state: String = state.to_owned().into();
+        println!("Setting state in notion: game {} = {}", note_id, &new_state);
+
+        let props: HashMap<String, PropertyValue> = HashMap::from([
+            ("State".to_string(), conv::to_text(&new_state))
+        ]);
+
+        Ok(self.update_row(note_id, props)?)
     }
 }
