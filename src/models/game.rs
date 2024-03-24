@@ -45,10 +45,56 @@ impl Into<i64> for GameId {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub enum GameState {
+    Completed,
+    InProgress,
+    NoRelease,
+    PlayAgain,
+    PlaySoon,
+    Released,
+    Tried,
+    Upcoming,
+    Other(String)
+}
+
+impl From<String> for GameState {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "Completed" => GameState::Completed,
+            "InProgress" => GameState::InProgress,
+            "NoRelease" => GameState::NoRelease,
+            "PlayAgain" => GameState::PlayAgain,
+            "PlaySoon" => GameState::PlaySoon,
+            "Released" => GameState::Released,
+            "Tried" => GameState::Tried,
+            "Upcoming" => GameState::Upcoming,
+            _ => GameState::Other(s),
+        }
+    }
+}
+
+impl Into<String> for GameState {
+    fn into(self) -> String {
+        match self {
+            GameState::Completed => "Completed".to_string(),
+            GameState::InProgress => "InProgress".to_string(),
+            GameState::NoRelease => "NoRelease".to_string(),
+            GameState::PlayAgain => "PlayAgain".to_string(),
+            GameState::PlaySoon => "PlaySoon".to_string(),
+            GameState::Released => "Released".to_string(),
+            GameState::Tried => "Tried".to_string(),
+            GameState::Upcoming => "Upcoming".to_string(),
+            GameState::Other(s) => s,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NotedGame {
     pub note_id: String,
     pub app_id: Option<GameId>,
+    pub state: Option<GameState>,
     pub tags: Vec<String>,
     pub my_rating: Option<u8>,
     pub notes: Option<String>,

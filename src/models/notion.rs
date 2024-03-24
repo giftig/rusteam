@@ -8,6 +8,8 @@ use notion::models::text::RichText;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::models::game::GameState;
+
 #[derive(Debug, Error)]
 pub enum ExtractError {
     #[error("Bad value found in notion row: {0}")]
@@ -17,51 +19,6 @@ pub enum ExtractError {
 }
 
 pub type Result<T> = std::result::Result<T, ExtractError>;
-
-#[derive(Debug)]
-pub enum GameState {
-    Completed,
-    InProgress,
-    NoRelease,
-    PlayAgain,
-    PlaySoon,
-    Released,
-    Tried,
-    Upcoming,
-    Other(String)
-}
-
-impl From<String> for GameState {
-    fn from(s: String) -> Self {
-        match s.as_str() {
-            "Completed" => GameState::Completed,
-            "InProgress" => GameState::InProgress,
-            "NoRelease" => GameState::NoRelease,
-            "PlayAgain" => GameState::PlayAgain,
-            "PlaySoon" => GameState::PlaySoon,
-            "Released" => GameState::Released,
-            "Tried" => GameState::Tried,
-            "Upcoming" => GameState::Upcoming,
-            _ => GameState::Other(s),
-        }
-    }
-}
-
-impl Into<String> for GameState {
-    fn into(self) -> String {
-        match self {
-            GameState::Completed => "Completed".to_string(),
-            GameState::InProgress => "InProgress".to_string(),
-            GameState::NoRelease => "NoRelease".to_string(),
-            GameState::PlayAgain => "PlayAgain".to_string(),
-            GameState::PlaySoon => "PlaySoon".to_string(),
-            GameState::Released => "Released".to_string(),
-            GameState::Tried => "Tried".to_string(),
-            GameState::Upcoming => "Upcoming".to_string(),
-            GameState::Other(s) => s,
-        }
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct GameTag(pub String);

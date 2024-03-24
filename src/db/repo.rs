@@ -248,10 +248,11 @@ impl PlayedGamesHandling for Repo {
 impl NotedGamesHandling for Repo {
     async fn insert_noted_games(&self, notes: &[NotedGame]) -> Result<()> {
         let q = r#"
-            INSERT INTO noted_game (note_id, app_id, first_noted, my_rating, notes)
-            VALUES($1, $2, $3, $4, $5)
+            INSERT INTO noted_game (note_id, app_id, state, first_noted, my_rating, notes)
+            VALUES($1, $2, $3, $4, $5, $6)
             ON CONFLICT (note_id) DO UPDATE
                 SET app_id = excluded.app_id,
+                    state = excluded.state,
                     my_rating = excluded.my_rating,
                     notes = excluded.notes
         "#;
@@ -265,6 +266,7 @@ impl NotedGamesHandling for Repo {
                     &[
                         &n.note_id,
                         &n.app_id.map(|id| i64::from(id.app_id)),
+                        &n.state.clone().map(|s| Into::<String>::into(s)),
                         &n.first_noted.naive_utc(),
                         &n.my_rating.map(i16::from),
                         &n.notes

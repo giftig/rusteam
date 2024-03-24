@@ -149,6 +149,7 @@ impl Sync {
                     NotedGame {
                         note_id: n.id.clone(),
                         app_id: app_id,
+                        state: n.state.clone(),
                         tags: n.tags.clone().into_iter().map(|t| t.0).collect(),
                         my_rating: n.rating,
                         notes: n.notes.clone(),
