@@ -85,10 +85,10 @@ impl Sync {
 
     async fn sync_game_details(&self) -> Result<()> {
         let missing_games = self.repo.get_owned_games_missing_details().await?;
-        let noted_games = self.repo.get_noted_game_ids().await?;
+        let noted_games = self.repo.get_upcoming_noted_game_ids().await?;
 
         println!(
-            "Reading game details from steam: {} missing / {} noted games",
+            "Reading game details from steam: {} owned (missing) / {} noted (unreleased) games",
             &missing_games.len(),
             &noted_games.len()
         );

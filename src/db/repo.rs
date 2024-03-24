@@ -88,7 +88,7 @@ pub trait PlayedGamesHandling {
 pub trait NotedGamesHandling {
     async fn insert_noted_games(&self, notes: &[NotedGame]) -> Result<()>;
     async fn get_appids_by_name<T: AsRef<str>>(&self, names: &[T]) -> Result<HashMap<String, GameId>>;
-    async fn get_noted_game_ids(&self) -> Result<Vec<GameId>>;
+    async fn get_upcoming_noted_game_ids(&self) -> Result<Vec<GameId>>;
 }
 
 impl SteamGamesHandling for Repo {
@@ -289,8 +289,14 @@ impl NotedGamesHandling for Repo {
                 .collect()
         )
     }
-    async fn get_noted_game_ids(&self) -> Result<Vec<GameId>> {
-        let q = "SELECT app_id FROM noted_game WHERE app_id IS NOT NULL";
+    async fn get_upcoming_noted_game_ids(&self) -> Result<Vec<GameId>> {
+        let q = r#"
+            SELECT app_id FROM noted_game
+            WHERE
+                app_id IS NOT NULL AND
+                (state IS NULL OR state IN ('No release', 'Upcoming'))
+        "#;
+
         Ok(
             self.db
                 .query(q, &[]).await?

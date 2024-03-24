@@ -58,14 +58,22 @@ pub enum GameState {
     Other(String)
 }
 
+impl GameState {
+    // Whether the given state represents a game which has been released. We'll try to update
+    // the status of any games we think aren't yet released regularly.
+    pub fn is_released(&self) -> bool {
+        *self != GameState::NoRelease && *self != GameState::Upcoming
+    }
+}
+
 impl From<String> for GameState {
     fn from(s: String) -> Self {
         match s.as_str() {
             "Completed" => GameState::Completed,
-            "InProgress" => GameState::InProgress,
-            "NoRelease" => GameState::NoRelease,
-            "PlayAgain" => GameState::PlayAgain,
-            "PlaySoon" => GameState::PlaySoon,
+            "In progress" => GameState::InProgress,
+            "No release" => GameState::NoRelease,
+            "Play again" => GameState::PlayAgain,
+            "Play soon" => GameState::PlaySoon,
             "Released" => GameState::Released,
             "Tried" => GameState::Tried,
             "Upcoming" => GameState::Upcoming,
@@ -78,10 +86,10 @@ impl Into<String> for GameState {
     fn into(self) -> String {
         match self {
             GameState::Completed => "Completed".to_string(),
-            GameState::InProgress => "InProgress".to_string(),
-            GameState::NoRelease => "NoRelease".to_string(),
-            GameState::PlayAgain => "PlayAgain".to_string(),
-            GameState::PlaySoon => "PlaySoon".to_string(),
+            GameState::InProgress => "In progress".to_string(),
+            GameState::NoRelease => "No release".to_string(),
+            GameState::PlayAgain => "Play again".to_string(),
+            GameState::PlaySoon => "Play soon".to_string(),
             GameState::Released => "Released".to_string(),
             GameState::Tried => "Tried".to_string(),
             GameState::Upcoming => "Upcoming".to_string(),
