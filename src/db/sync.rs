@@ -4,7 +4,7 @@ use chrono::Utc;
 use thiserror::Error;
 
 use crate::db::repo::*;
-use crate::models::game::{GameId, NotedGame, PlayedGame};
+use crate::models::game::{GameId, GameState, NotedGame, PlayedGame};
 use crate::models::notion::GameNote;
 use crate::notion::{NotionError, NotionGamesRepo};
 use crate::steam::*;
@@ -174,6 +174,16 @@ impl Sync {
             .collect()
     }
 
+    async fn update_release_states(&self) -> Result<()> {
+        let updated_games = self.repo.get_newly_released_games().await?;
+
+        for game in updated_games {
+            println!("🚀 {} is newly released!", &game.name);
+            self.notion.set_state(&game.note_id, &GameState::Released)?;
+        }
+        Ok(())
+    }
+
     pub async fn sync_notion(&self) -> Result<()> {
         let notes = self.notion.get_notes().await?;
 
@@ -185,6 +195,7 @@ impl Sync {
 
         self.repo.insert_noted_games(&noted_games).await?;
         self.write_app_ids_to_notion(&missing_app_ids, &found_app_ids)?;
+        self.update_release_states().await?;
 
         // TODO: Populate game tags in postgres
         // Try using fuzzy matching to look up app ids by fuzzy name search

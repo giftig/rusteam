@@ -6,7 +6,7 @@ use chrono::Utc;
 use thiserror::Error;
 use tokio_postgres::{Client, Error as PgError};
 
-use crate::models::game::{GameDetails, GameId, NotedGame, PlayedGame};
+use crate::models::game::{GameDetails, GameId, NotedGame, PlayedGame, ReleasedGame};
 
 #[derive(Error, Debug)]
 pub enum RepoError {
@@ -89,6 +89,7 @@ pub trait NotedGamesHandling {
     async fn insert_noted_games(&self, notes: &[NotedGame]) -> Result<()>;
     async fn get_appids_by_name<T: AsRef<str>>(&self, names: &[T]) -> Result<HashMap<String, GameId>>;
     async fn get_upcoming_noted_game_ids(&self) -> Result<Vec<GameId>>;
+    async fn get_newly_released_games(&self) -> Result<Vec<ReleasedGame>>;
 }
 
 impl SteamGamesHandling for Repo {
@@ -302,6 +303,30 @@ impl NotedGamesHandling for Repo {
                 .query(q, &[]).await?
                 .into_iter()
                 .map(|row| GameId::from(row.get::<usize, i64>(0)))
+                .collect()
+        )
+    }
+
+    async fn get_newly_released_games(&self) -> Result<Vec<ReleasedGame>> {
+        let q = r#"
+            SELECT
+                ng.note_id,
+                sg.name
+            FROM
+                noted_game ng
+                LEFT JOIN game_details gd ON ng.app_id = gd.app_id
+                LEFT JOIN steam_game sg ON ng.app_id = sg.app_id
+            WHERE
+                ng.app_id IS NOT NULL AND
+                (ng.state IS NULL OR ng.state IN ('No release', 'Upcoming')) AND
+                gd.is_released IS TRUE
+        "#;
+
+        Ok(
+            self.db
+                .query(q, &[]).await?
+                .into_iter()
+                .map(|row| ReleasedGame { note_id: row.get(0), name: row.get(1) })
                 .collect()
         )
     }

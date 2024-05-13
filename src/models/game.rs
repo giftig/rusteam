@@ -141,3 +141,10 @@ pub struct GameDetails {
     pub release_date: Option<String>,
     pub recorded: DateTime<Utc>,
 }
+
+// Represents details of a game newly released and in need of update in notion
+#[derive(Debug)]
+pub struct ReleasedGame {
+    pub note_id: String,
+    pub name: String,
+}

@@ -62,6 +62,8 @@ impl NotionGamesRepo {
 
     fn update_row(&self, note_id: &str, props: HashMap<String, PropertyValue>) -> Result<()> {
         let body = UpdatePage { properties: Properties { properties: props } };
+//        println!("{}", serde_json::to_string(&body).unwrap());
+//        return Ok(());
 
         // Notion crate doesn't support this operation so we'll do it directly with ureq
         let url = format!("https://api.notion.com/v1/pages/{}", note_id);
@@ -86,11 +88,11 @@ impl NotionGamesRepo {
     }
 
     pub fn set_state(&self, note_id: &str, state: &GameState) -> Result<()> {
-        let new_state: String = state.to_owned().into();
-        println!("Setting state in notion: game {} = {}", note_id, &new_state);
+        let pretty_state: String = state.to_owned().into();
+        println!("Setting state in notion: game {} = {}", note_id, &pretty_state);
 
         let props: HashMap<String, PropertyValue> = HashMap::from([
-            ("State".to_string(), conv::to_text(&new_state))
+            ("State".to_string(), conv::to_state(&state))
         ]);
 
         Ok(self.update_row(note_id, props)?)
