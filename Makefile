@@ -6,4 +6,4 @@ bootstrap:
 	@./scripts/bootstrap.sh
 
 destroy:
-	docker-compose down --volumes
+	docker compose down --volumes

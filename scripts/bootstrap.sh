@@ -13,14 +13,14 @@ await_service() {
   local count=0
 
   echo -n "Waiting for $container_name..."
-  while ! docker-compose logs "$container_name" | grep -F "$log_search" > /dev/null; do
+  while ! docker compose logs "$container_name" | grep -F "$log_search" > /dev/null; do
     echo -n "."
     sleep 2
     ((++count))
 
     if [[ "$count" -gt 20 ]]; then
       echo " [ ${RED}FAILED${RESET} ]"
-      docker-compose logs "$container_name" >&2
+      docker compose logs "$container_name" >&2
       return 1
     fi
   done
@@ -29,5 +29,5 @@ await_service() {
   return 0
 }
 
-docker-compose up -d
+docker compose up -d
 await_service db 'ready to accept connections'

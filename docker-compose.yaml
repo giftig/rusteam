@@ -1,7 +1,7 @@
 version: "3.8"
 
 services:
-  db:
+  rusteam_db:
     image: postgres:16.2
     environment:
       - POSTGRES_USER=admin
@@ -11,6 +11,12 @@ services:
       - ${RUSTEAM_DB_PORT:-5432}:5432
     volumes:
       - db_data:/var/lib/postgresql/data
+    networks:
+      - rusteam-public
 
 volumes:
   db_data:
+
+networks:
+  rusteam-public:
+    name: rusteam-public
