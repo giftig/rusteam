@@ -1,0 +1,2 @@
+flask-session==0.5.0
+-e file:.[postgres,hive,trino]

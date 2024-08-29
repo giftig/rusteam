@@ -9,6 +9,7 @@ FROM noted_game n
   LEFT JOIN steam_game s ON n.app_id = s.app_id
   LEFT JOIN game_details d ON n.app_id = d.app_id
 WHERE
-  n.state IN ('No release', 'Upcoming')
+  n.state IN ('No release', 'Upcoming') AND
+  n.app_id IS NOT NULL
 ORDER BY
   s.name;

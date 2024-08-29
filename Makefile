@@ -7,3 +7,9 @@ bootstrap:
 
 destroy:
 	docker compose down --volumes
+
+superset-up:
+	cd superset && docker compose up -d
+
+superset-down:
+	cd superset && docker compose down
