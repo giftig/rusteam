@@ -30,4 +30,4 @@ await_service() {
 }
 
 docker compose up -d
-await_service db 'ready to accept connections'
+await_service rusteam_db 'ready to accept connections'
