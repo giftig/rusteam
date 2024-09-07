@@ -97,8 +97,9 @@ impl Sync {
             missing_games.into_iter().chain(noted_games.into_iter()).collect()
         };
 
-        let details = self.steam.get_game_details(&refresh_ids)?;
+        let (details, failures) = self.steam.get_game_details(&refresh_ids)?;
         self.repo.insert_game_details(&details).await?;
+        self.repo.mark_game_detail_failures(&failures).await;
         Ok(())
     }
 

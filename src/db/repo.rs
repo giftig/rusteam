@@ -3,6 +3,7 @@ use std::num::TryFromIntError;
 use std::time::Duration;
 
 use chrono::Utc;
+use itertools::Itertools;
 use thiserror::Error;
 use tokio_postgres::{Client, Error as PgError};
 
@@ -79,6 +80,7 @@ pub trait OwnedGamesHandling {
 pub trait GameDetailsHandling {
     async fn get_owned_games_missing_details(&self) -> Result<Vec<GameId>>;
     async fn insert_game_details(&self, details: &[GameDetails]) -> Result<()>;
+    async fn mark_game_detail_failures(&self, games: &[GameId]) -> ();
 }
 
 pub trait PlayedGamesHandling {
@@ -118,11 +120,24 @@ impl GameDetailsHandling for Repo {
         // Limit results to 100 to avoid backfilling hundreds of games at once; we can catch up
         // 100 at a time over several syncs this way.
         // This is just a very basic way of avoiding hitting the Steam API rate limit
+
+        // N.B. we also join to game_details_blacklist to avoid repeatedly scraping games for
+        // which steam doesn't return a well-formed definition
         let q = r#"
-            SELECT o.app_id
-            FROM owned_game o LEFT OUTER JOIN game_details d ON o.app_id = d.app_id
-            WHERE d.app_id IS NULL
-            LIMIT 100
+            SELECT
+                o.app_id
+            FROM
+                owned_game o
+                LEFT JOIN game_details d ON o.app_id = d.app_id
+                LEFT JOIN game_details_blacklist b ON o.app_id = b.app_id
+            WHERE
+                d.app_id IS NULL AND
+                (
+                    b.failure_count < 5 OR
+                    b.failure_count IS NULL
+                )
+            LIMIT
+                100
         "#;
 
         Ok(
@@ -181,6 +196,31 @@ impl GameDetailsHandling for Repo {
 
         println!("Inserted {} new game details into game_details table", row_count);
         Ok(())
+    }
+
+    async fn mark_game_detail_failures(&self, games: &[GameId]) -> () {
+        if games.len() == 0 {
+            return ();
+        }
+
+        eprintln!(
+            "Incrementing failure count for game details which could not be parsed: [{}]",
+            games.iter().format(", ")
+        );
+
+        // Insert 1 failure into the blacklist table or increment the value already present
+        let q = r#"
+            INSERT INTO game_details_blacklist (app_id, failure_count)
+            VALUES($1, 1)
+            ON CONFLICT (app_id) DO UPDATE SET failure_count = excluded.failure_count + 1;
+        "#;
+
+        for id in games {
+            let res = self.db.execute(q, &[&Into::<i64>::into(id.clone())]).await;
+            if let Err(err) = res {
+                eprintln!("Failed to increment failure count for id {}: {}", &id, &err);
+            }
+        }
     }
 }
 

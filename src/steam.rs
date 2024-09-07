@@ -30,7 +30,7 @@ pub trait SteamAppsServiceHandling {
 }
 
 pub trait SteamAppDetailsHandling {
-    fn get_game_details(&self, ids: &[GameId]) -> Result<Vec<GameDetails>>;
+    fn get_game_details(&self, ids: &[GameId]) -> Result<(Vec<GameDetails>, Vec<GameId>)>;
 }
 
 pub struct SteamClient {
@@ -91,8 +91,9 @@ impl SteamAppsServiceHandling for SteamClient {
 }
 
 impl SteamClient {
-    fn get_game_details_internal(&self, ids: &[GameId]) -> Result<HashMap<GameId, SteamAppDetails>> {
+    fn get_game_details_internal(&self, ids: &[GameId]) -> Result<(HashMap<GameId, SteamAppDetails>, Vec<GameId>)> {
         let mut results: HashMap<GameId, SteamAppDetailsResponseEntry> = HashMap::new();
+        let mut failures: Vec<GameId> = vec![];
 
         // Requests have to be made one by one unless we're only getting price_overview
         // TODO: This would be better done with an async http library rather than ureq
@@ -109,7 +110,8 @@ impl SteamClient {
                 match req.call()?.into_json::<SteamAppDetailsResponse>() {
                     Ok(r) => r,
                     Err(e) => {
-                        eprintln!("Bad JSON response from steam for appid {}: {}; skipping.", &appid, &e);
+                        eprintln!("Bad JSON response from steam for appid {}: {}; skipping.", &id, &e);
+                        failures.push(id.clone());
                         continue;
                     }
                 }
@@ -125,19 +127,23 @@ impl SteamClient {
             results.extend(details);
         }
 
-        Ok(results.into_iter().map(|(k, v)| (k, v.data)).collect())
+        Ok((results.into_iter().map(|(k, v)| (k, v.data)).collect(), failures))
     }
 }
 
 impl SteamAppDetailsHandling for SteamClient {
-    fn get_game_details(&self, ids: &[GameId]) -> Result<Vec<GameDetails>> {
+    fn get_game_details(&self, ids: &[GameId]) -> Result<(Vec<GameDetails>, Vec<GameId>)> {
         let now = Utc::now();
 
+        let (details, failures) = self.get_game_details_internal(ids)?;
         Ok(
-            self.get_game_details_internal(ids)?
-                .into_iter()
-                .map(|(id, d)| conv::extract_game_details(&id, &d, &now))
-                .collect()
+            (
+                details
+                    .into_iter()
+                    .map(|(id, d)| conv::extract_game_details(&id, &d, &now))
+                    .collect(),
+                failures
+            )
         )
     }
 }

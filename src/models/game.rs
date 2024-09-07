@@ -1,4 +1,5 @@
 use std::convert::From;
+use std::fmt;
 use std::hash::Hash;
 use std::time::Duration;
 
@@ -42,6 +43,11 @@ impl Into<String> for GameId {
 impl Into<i64> for GameId {
     fn into(self) -> i64 {
         self.app_id.into()
+    }
+}
+impl fmt::Display for GameId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", &self.app_id)
     }
 }
 
