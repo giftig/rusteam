@@ -42,7 +42,7 @@ fn fixture(categories: Vec<Category>, released: bool) -> SteamAppDetails {
         release_date: Some(
             ReleaseDate {
                 coming_soon: !released,
-                date: if released { "17 January 2020".to_string() } else { "2079".to_string() }
+                date: if released { "17 Jan 2020".to_string() } else { "2079".to_string() }
             }
         )
     }
@@ -62,7 +62,8 @@ fn convert_steam_details_released() {
         local_coop: false,
         metacritic_percent: Some(66),
         is_released: true,
-        release_date: Some("17 January 2020".to_string()),
+        release_date: Some("17 Jan 2020".to_string()),
+        release_estimate: Some(Utc.with_ymd_and_hms(2020, 1, 17, 0, 0, 0).unwrap()),
         recorded: now.clone()
     };
 
@@ -86,6 +87,7 @@ fn convert_steam_details_coming_soon() {
         metacritic_percent: Some(66),
         is_released: false,
         release_date: Some("2079".to_string()),
+        release_estimate: Some(Utc.with_ymd_and_hms(2080, 1, 1, 0, 0, 0).unwrap()),
         recorded: now.clone()
     };
 
@@ -109,6 +111,7 @@ fn convert_steam_details_remote_coop() {
         metacritic_percent: Some(66),
         is_released: false,
         release_date: Some("2079".to_string()),
+        release_estimate: Some(Utc.with_ymd_and_hms(2080, 1, 1, 0, 0, 0).unwrap()),
         recorded: now.clone()
     };
 
@@ -132,10 +135,35 @@ fn convert_steam_details_local_coop() {
         metacritic_percent: Some(66),
         is_released: false,
         release_date: Some("2079".to_string()),
+        release_estimate: Some(Utc.with_ymd_and_hms(2080, 1, 1, 0, 0, 0).unwrap()),
         recorded: now.clone()
     };
 
     let actual = extract_game_details(&id, &fix, &now);
 
     assert_eq!(actual, expected);
+}
+
+#[test]
+fn parse_release_date_exact_date() {
+    let expected = Utc.with_ymd_and_hms(2025, 6, 5, 0, 0, 0).unwrap();
+    let actual = parse_release_date("5 Jun, 2025");
+
+    assert_eq!(actual, Some(expected));
+}
+
+#[test]
+fn parse_release_date_year() {
+    let expected = Utc.with_ymd_and_hms(2028, 1, 1, 0, 0, 0).unwrap();
+    let actual = parse_release_date("2027");
+
+    assert_eq!(actual, Some(expected));
+}
+
+#[test]
+fn parse_release_date_month_year() {
+    let expected = Utc.with_ymd_and_hms(2025, 5, 1, 0, 0, 0).unwrap();
+    let actual = parse_release_date("Apr 2025");
+
+    assert_eq!(actual, Some(expected));
 }

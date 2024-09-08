@@ -104,6 +104,7 @@ impl Into<String> for GameState {
     }
 }
 
+// Represents a record in the noted_game table, matching a game noted in notion
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NotedGame {
     pub note_id: String,
@@ -145,6 +146,7 @@ pub struct GameDetails {
     pub metacritic_percent: Option<u8>,
     pub is_released: bool,
     pub release_date: Option<String>,
+    pub release_estimate: Option<DateTime<Utc>>,
     pub recorded: DateTime<Utc>,
 }
 

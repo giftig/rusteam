@@ -153,9 +153,9 @@ impl GameDetailsHandling for Repo {
         let q = r#"
             INSERT INTO game_details (
                 app_id, description, controller_support, coop, local_coop, metacritic_percent,
-                is_released, release_date, recorded
+                is_released, release_date, release_estimate, recorded
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (app_id) DO UPDATE
                 SET description = excluded.description,
                     controller_support = excluded.controller_support,
@@ -164,6 +164,7 @@ impl GameDetailsHandling for Repo {
                     metacritic_percent = excluded.metacritic_percent,
                     is_released = excluded.is_released,
                     release_date = excluded.release_date,
+                    release_estimate = excluded.release_estimate,
                     recorded = excluded.recorded
         "#;
 
@@ -183,6 +184,7 @@ impl GameDetailsHandling for Repo {
                         &d.metacritic_percent.map(i32::from),
                         &d.is_released,
                         &d.release_date,
+                        &d.release_estimate.map(|r| r.naive_utc()),
                         &d.recorded.naive_utc(),
                     ],
                 )
@@ -211,8 +213,8 @@ impl GameDetailsHandling for Repo {
         // Insert 1 failure into the blacklist table or increment the value already present
         let q = r#"
             INSERT INTO game_details_blacklist (app_id, failure_count)
-            VALUES($1, 1)
-            ON CONFLICT (app_id) DO UPDATE SET failure_count = excluded.failure_count + 1;
+            VALUES ($1, 1)
+            ON CONFLICT (app_id) DO UPDATE SET failure_count = game_details_blacklist.failure_count + 1;
         "#;
 
         for id in games {

@@ -3,7 +3,7 @@ mod tests;
 
 use std::collections::HashSet;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Months, TimeZone, Utc};
 
 use crate::models::game::{GameId, GameDetails};
 use crate::models::steam::SteamAppDetails;
@@ -13,6 +13,39 @@ const COOP_CAT_IDS: [u32; 4] = [1, 9, 38, 48];
 
 // "Shared/Split Screen Co-op", "Shared/Split Screen" categories
 const LOCAL_COOP_CAT_IDS: [u32; 2] = [39, 24];
+
+// Make an attempt to parse a release date into a DateTime estimate.
+// - Attempt to parse exact dates from the human-readable format given
+// - Treat month or years as the last day in that month / year
+// - Treat "coming soon", "to be announced" etc. as unknown
+fn parse_release_date(s: &str) -> Option<DateTime<Utc>> {
+    if s == "To be announced" || s == "Coming soon" {
+        return None;
+    }
+
+    let clean = s.replace(",", "").trim().to_owned();
+
+    // Basic exact day format used by Steam is like "5 Jan, 2020"
+    if let Ok(d) = NaiveDate::parse_from_str(&clean, "%d %b %Y") {
+        let dt = NaiveDateTime::new(d, NaiveTime::from_hms_opt(0, 0, 0)?);
+        return Some(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+    }
+
+    // Look for a year, like "2025", and return midnight, 1st Jan on the following year
+    if let Ok(year) = clean.parse::<i32>() {
+        return Utc.with_ymd_and_hms(year + 1, 1, 1, 0, 0, 0).single();
+    }
+
+    // TODO: Look for month and year like "Mar 2025". Unfortunately chrono doesn't help us much
+    // here because it refuses to parse an imprecise date like this even into a NaiveDate, so we'll
+    // try sticking a 1 before it and parsing it as above, then adding a month.
+    if let Ok(d) = NaiveDate::parse_from_str(&format!("1 {}", &clean), "%d %b %Y") {
+        let dt = NaiveDateTime::new(d + Months::new(1), NaiveTime::from_hms_opt(0, 0, 0)?);
+        return Some(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+    }
+
+    None
+}
 
 pub(super) fn extract_game_details(
     id: &GameId,
@@ -36,6 +69,7 @@ pub(super) fn extract_game_details(
         metacritic_percent: steam.metacritic.clone().map(|m| m.score),
         is_released: steam.release_date.clone().map(|r| !r.coming_soon).unwrap_or(false),
         release_date: steam.release_date.clone().map(|r| r.date),
+        release_estimate: steam.release_date.as_ref().and_then(|r| parse_release_date(&r.date)),
         recorded: now.clone(),
     }
 }
