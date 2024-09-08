@@ -135,7 +135,7 @@ pub struct PlayedGame {
 }
 
 // Represents a record in the game_details table
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct GameDetails {
     pub id: GameId,
     pub description: Option<String>,

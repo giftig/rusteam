@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-chrono = { version = "0.4.31", features = ["now", "serde"] }
+chrono = { version = "0.4.38", features = ["now", "serde"] }
 futures = "0.3.30"
 home = "0.5.9"
 itertools = "0.13.0"
