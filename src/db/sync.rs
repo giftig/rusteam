@@ -4,7 +4,7 @@ use chrono::Utc;
 use thiserror::Error;
 
 use crate::db::repo::*;
-use crate::models::game::{GameId, GameState, NotedGame, PlayedGame};
+use crate::models::game::{GameId, GameDetails, GameState, NotedGame, PlayedGame};
 use crate::models::notion::GameNote;
 use crate::notion::{NotionError, NotionGamesRepo};
 use crate::steam::*;
@@ -83,6 +83,28 @@ impl Sync {
         Ok(())
     }
 
+    // Check if updated entries for noted games contain a change to release dates and
+    // notify via the log what these changes were
+    async fn check_updated_release_dates(&self, games: &[&GameDetails]) -> Result<()> {
+        println!("Checking for updated release dates...");
+
+        let ids: Vec<&GameId> = games.iter().map(|&g| &g.id).collect();
+        let previous_release_dates: HashMap<GameId, String> = self.repo.get_release_dates(&ids).await?;
+
+        for g in games {
+            match (previous_release_dates.get(&g.id), &g.release_date) {
+                (Some(prev), Some(ref curr)) =>
+                    if prev != curr {
+                        println!("🔎 Release date changed for {}: \"{}\" -> \"{}\"", &g.id, prev, curr);
+                    }
+                _ =>
+                    ()
+            }
+        }
+
+        Ok(())
+    }
+
     async fn sync_game_details(&self) -> Result<()> {
         let missing_games = self.repo.get_owned_games_missing_details().await?;
         let noted_games = self.repo.get_upcoming_noted_game_ids().await?;
@@ -94,10 +116,23 @@ impl Sync {
         );
 
         let refresh_ids: Vec<GameId> = {
-            missing_games.into_iter().chain(noted_games.into_iter()).collect()
+            missing_games.into_iter().chain(noted_games.clone().into_iter()).collect()
         };
 
         let (details, failures) = self.steam.get_game_details(&refresh_ids)?;
+
+        // Collect the retrieved details for noted_games, we'll need them to check release changes
+        let mut noted_game_details = vec![];
+        for d in &details {
+            if noted_games.contains(&d.id) {
+                noted_game_details.push(d);
+            }
+        }
+
+        if let Err(e) = self.check_updated_release_dates(&noted_game_details).await {
+            eprintln!("Failed to check for updated release dates: {}", e)
+        }
+
         self.repo.insert_game_details(&details).await?;
         self.repo.mark_game_detail_failures(&failures).await;
         Ok(())

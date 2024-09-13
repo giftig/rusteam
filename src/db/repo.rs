@@ -81,6 +81,7 @@ pub trait GameDetailsHandling {
     async fn get_owned_games_missing_details(&self) -> Result<Vec<GameId>>;
     async fn insert_game_details(&self, details: &[GameDetails]) -> Result<()>;
     async fn mark_game_detail_failures(&self, games: &[GameId]) -> ();
+    async fn get_release_dates(&self, games: &[&GameId]) -> Result<HashMap<GameId, String>>;
 }
 
 pub trait PlayedGamesHandling {
@@ -224,6 +225,19 @@ impl GameDetailsHandling for Repo {
             }
         }
     }
+
+    async fn get_release_dates(&self, app_ids: &[&GameId]) -> Result<HashMap<GameId, String>> {
+        let q = r#"SELECT app_id, release_date FROM game_details WHERE app_id = ANY ($1);"#;
+
+        Ok(
+            self.db
+                .query(q, &[&app_ids.iter().map(|&id| Into::<i64>::into(id.clone())).collect::<Vec<_>>()])
+                .await?
+                .into_iter()
+                .map(|row| (GameId::from(row.get::<usize, i64>(0)), row.get(1)))
+                .collect()
+        )
+    }
 }
 
 impl OwnedGamesHandling for Repo {
@@ -332,6 +346,7 @@ impl NotedGamesHandling for Repo {
                 .collect()
         )
     }
+
     async fn get_upcoming_noted_game_ids(&self) -> Result<Vec<GameId>> {
         let q = r#"
             SELECT app_id FROM noted_game
