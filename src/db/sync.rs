@@ -6,6 +6,7 @@ use thiserror::Error;
 use crate::db::repo::*;
 use crate::models::game::{GameId, GameDetails, GameState, NotedGame, PlayedGame};
 use crate::models::notion::GameNote;
+use crate::notify::{Notification, NotificationHandling};
 use crate::notion::{NotionError, NotionGamesRepo};
 use crate::steam::*;
 
@@ -22,28 +23,33 @@ pub enum SyncError {
 pub type Result<T> = std::result::Result<T, SyncError>;
 
 // TODO: Split into SteamSync + NotionSync and abstract over the top for better organisation
-pub struct Sync {
+pub struct Sync<'a> {
     steam_account_id: String,
     repo: Repo,
     steam: SteamClient,
-    notion: NotionGamesRepo
+    notion: NotionGamesRepo,
+    notifier: &'a mut dyn NotificationHandling
 }
 
-impl Sync {
-    pub fn new(
+impl Sync<'_> {
+    pub fn new<'a>(
         steam_account_id: &str,
         repo: Repo,
         steam: SteamClient,
-        notion: NotionGamesRepo
-    ) -> Sync {
+        notion: NotionGamesRepo,
+        notifier: &'a mut dyn NotificationHandling
+    ) -> Sync<'a> {
         Sync {
             steam_account_id: steam_account_id.to_string(),
             repo: repo,
             steam: steam,
-            notion: notion
+            notion: notion,
+            notifier: notifier
         }
     }
+}
 
+impl Sync<'_> {
     async fn sync_steam_games(&self) -> Result<()> {
         let all_games: HashMap<u32, String> = self.steam
             .get_all_games()?
@@ -85,7 +91,7 @@ impl Sync {
 
     // Check if updated entries for noted games contain a change to release dates and
     // notify via the log what these changes were
-    async fn check_updated_release_dates(&self, games: &[&GameDetails]) -> Result<()> {
+    async fn check_updated_release_dates(&mut self, games: &[&GameDetails]) -> Result<()> {
         println!("Checking for updated release dates...");
 
         let ids: Vec<&GameId> = games.iter().map(|&g| &g.id).collect();
@@ -95,7 +101,11 @@ impl Sync {
             match (previous_release_dates.get(&g.id), &g.release_date) {
                 (Some(prev), Some(ref curr)) =>
                     if prev != curr {
-                        println!("🔎 Release date changed for {}: \"{}\" -> \"{}\"", &g.id, prev, curr);
+                        self.notifier.enqueue(Notification::ReleaseDateUpdated {
+                            game: g.id.clone(),
+                            prev: prev.clone(),
+                            updated: curr.clone()
+                        });
                     }
                 _ =>
                     ()
@@ -105,7 +115,7 @@ impl Sync {
         Ok(())
     }
 
-    async fn sync_game_details(&self) -> Result<()> {
+    async fn sync_game_details(&mut self) -> Result<()> {
         let missing_games = self.repo.get_owned_games_missing_details().await?;
         let noted_games = self.repo.get_upcoming_noted_game_ids().await?;
 
@@ -138,7 +148,7 @@ impl Sync {
         Ok(())
     }
 
-    pub async fn sync_steam(&self) -> Result<()> {
+    pub async fn sync_steam(&mut self) -> Result<()> {
         self.sync_steam_games().await?;
         self.sync_game_details().await?;
         self.sync_owned_games().await?;
@@ -147,7 +157,7 @@ impl Sync {
     }
 }
 
-impl Sync {
+impl Sync<'_> {
     fn write_app_ids_to_notion(
         &self,
         missing: &[(String, String)],
@@ -210,17 +220,18 @@ impl Sync {
             .collect()
     }
 
-    async fn update_release_states(&self) -> Result<()> {
+    async fn update_release_states(&mut self) -> Result<()> {
         let updated_games = self.repo.get_newly_released_games().await?;
 
         for game in updated_games {
-            println!("🚀 {} is newly released!", &game.name);
+            // FIXME: Use appid, let notifier resolve name
+            self.notifier.enqueue(Notification::Released { game: game.name.clone() });
             self.notion.set_state(&game.note_id, &GameState::Released)?;
         }
         Ok(())
     }
 
-    pub async fn sync_notion(&self) -> Result<()> {
+    pub async fn sync_notion(&mut self) -> Result<()> {
         let notes = self.notion.get_notes().await?;
 
         let missing_app_ids = Self::missing_app_ids(&notes);

@@ -1,6 +1,7 @@
 mod db;
 pub mod config;
 pub mod models;
+pub mod notify;
 pub mod notion;
 pub mod steam;
 
@@ -10,6 +11,7 @@ use tokio_postgres::{Client as DbClient, NoTls};
 use crate::db::migrations;
 use crate::db::repo::Repo;
 use crate::db::sync::Sync;
+use crate::notify::{NotificationHandling, PrintNotifier};
 use crate::notion::NotionGamesRepo;
 use crate::steam::SteamClient;
 
@@ -43,8 +45,11 @@ async fn main() {
     let repo = Repo::new(db_client);
     let steam_client = SteamClient::new(&conf.steam.api_key);
     let notion = NotionGamesRepo::new(&conf.notion.api_key, &conf.notion.database_id);
+    let mut notifier = PrintNotifier::new();
 
-    let sync = Sync::new(&conf.steam.user_id, repo, steam_client, notion);
+    let mut sync = Sync::new(&conf.steam.user_id, repo, steam_client, notion, &mut notifier);
     sync.sync_steam().await.unwrap();
     sync.sync_notion().await.unwrap();
+
+    notifier.run();
 }
