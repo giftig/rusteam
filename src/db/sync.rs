@@ -89,7 +89,7 @@ impl Sync<'_> {
         Ok(())
     }
 
-    // Check if updated entries for noted games contain a change to release dates and
+    // Check if updated game details entries contain a change to release dates and
     // notify via the log what these changes were
     async fn check_updated_release_dates(&mut self, games: &[&GameDetails]) -> Result<()> {
         println!("Checking for updated release dates...");
@@ -100,6 +100,9 @@ impl Sync<'_> {
         for g in games {
             match (previous_release_dates.get(&g.id), &g.release_date) {
                 (Some(prev), Some(ref curr)) =>
+                    // TODO: Should consider moving the release notification to here instead,
+                    // as currently the actual release notifications will only affected noted
+                    // games, not wishlisted ones.
                     if prev != curr {
                         self.notifier.enqueue(Notification::ReleaseDateUpdated {
                             game: g.id.clone(),
@@ -116,30 +119,35 @@ impl Sync<'_> {
     }
 
     async fn sync_game_details(&mut self) -> Result<()> {
-        let missing_games = self.repo.get_owned_games_missing_details().await?;
+        let missing_games = self.repo.get_games_missing_details().await?;
         let noted_games = self.repo.get_upcoming_noted_game_ids().await?;
+        let wishlisted_games = self.repo.get_upcoming_wishlisted_game_ids().await?;
 
         println!(
-            "Reading game details from steam: {} owned (missing) / {} noted (unreleased) games",
+            "Reading game details from steam. {} missing, upcoming: {} noted, {} wishlisted",
             &missing_games.len(),
-            &noted_games.len()
+            &noted_games.len(),
+            &wishlisted_games.len(),
         );
 
         let refresh_ids: Vec<GameId> = {
-            missing_games.into_iter().chain(noted_games.clone().into_iter()).collect()
+            missing_games.into_iter()
+                .chain(noted_games.clone().into_iter())
+                .chain(wishlisted_games.clone().into_iter())
+                .collect()
         };
 
         let (details, failures) = self.steam.get_game_details(&refresh_ids)?;
 
         // Collect the retrieved details for noted_games, we'll need them to check release changes
-        let mut noted_game_details = vec![];
+        let mut tracked_details = vec![];
         for d in &details {
-            if noted_games.contains(&d.id) {
-                noted_game_details.push(d);
+            if noted_games.contains(&d.id) || wishlisted_games.contains(&d.id) {
+                tracked_details.push(d);
             }
         }
 
-        if let Err(e) = self.check_updated_release_dates(&noted_game_details).await {
+        if let Err(e) = self.check_updated_release_dates(&tracked_details).await {
             eprintln!("Failed to check for updated release dates: {}", e)
         }
 

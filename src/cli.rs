@@ -15,7 +15,7 @@ impl Cli {
     async fn run(&self) {
         match self {
             Self::Sync(cmd) => cmd.run().await,
-            Self::ImportWishlist(cmd) => cmd.run().await,
+            Self::ImportWishlist(cmd) => cmd.run().await.unwrap(),
         }
     }
 }

@@ -1,4 +1,4 @@
-mod conv;
+pub mod conv;
 
 use std::collections::HashMap;
 use std::time::Duration;

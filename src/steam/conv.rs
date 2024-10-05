@@ -4,8 +4,10 @@ mod tests;
 use std::collections::HashSet;
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Months, TimeZone, Utc};
+use serde_json;
+use thiserror::Error;
 
-use crate::models::game::{GameId, GameDetails};
+use crate::models::game::{GameId, GameDetails, WishlistedGame};
 use crate::models::steam::SteamAppDetails;
 
 // "Multiplayer", "Co-op", "Online Co-op", "LAN Co-op" categories
@@ -13,6 +15,12 @@ const COOP_CAT_IDS: [u32; 4] = [1, 9, 38, 48];
 
 // "Shared/Split Screen Co-op", "Shared/Split Screen" categories
 const LOCAL_COOP_CAT_IDS: [u32; 2] = [39, 24];
+
+#[derive(Error, Debug)]
+#[error("{0}")]
+pub struct ConvError(String);
+
+type Result<T> = std::result::Result<T, ConvError>;
 
 // Make an attempt to parse a release date into a DateTime estimate.
 // - Attempt to parse exact dates from the human-readable format given
@@ -72,4 +80,36 @@ pub(super) fn extract_game_details(
         release_estimate: steam.release_date.as_ref().and_then(|r| parse_release_date(&r.date)),
         recorded: now.clone(),
     }
+}
+
+/// Extract a wishlist from raw JSON data; this will be an object with appids as keys
+pub(crate) fn extract_wishlist(v: &serde_json::Value) -> Result<Vec<WishlistedGame>> {
+    let m = v.as_object().ok_or(ConvError("Expected JSON object at root level".to_string()))?;
+
+    m
+        .into_iter()
+        .map(|(k, v)| {
+            let id: GameId = {
+                k.as_str().try_into()
+                    .map_err(|_| ConvError(format!("Failed to convert appid {}", &k)))?
+            };
+
+            let wishlisted: i64 = {
+                v.get("added")
+                    .ok_or(ConvError("Missing added field".to_string()))?
+                    .as_number()
+                    .ok_or(ConvError("Expected unix timestamp for added field".to_string()))?
+                    .as_i64()
+                    .ok_or(ConvError("Non-i64 unix timestamp for added field".to_string()))?
+            };
+
+            let ts = {
+                Utc.timestamp_opt(wishlisted, 0)
+                    .single()
+                    .ok_or(ConvError("Bad unix timestamp for added field".to_string()))?
+            };
+
+            Ok(WishlistedGame { id: id, wishlisted: ts, deleted: None })
+        })
+        .collect()
 }

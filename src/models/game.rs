@@ -104,7 +104,7 @@ impl Into<String> for GameState {
     }
 }
 
-// Represents a record in the noted_game table, matching a game noted in notion
+/// Represents a record in the noted_game table, matching a game noted in notion
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NotedGame {
     pub note_id: String,
@@ -116,7 +116,7 @@ pub struct NotedGame {
     pub first_noted: DateTime<Utc>,
 }
 
-// Represents a cleaner / simplified version of SteamOwnedGame to hold playtime details
+/// Represents a cleaner / simplified version of SteamOwnedGame to hold playtime details
 // TODO: Consider replacing SteamOwnedGame with this model and deserialising directly into it
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SteamPlaytime {
@@ -126,7 +126,7 @@ pub struct SteamPlaytime {
     pub last_played: DateTime<Utc>,
 }
 
-// Represents a record in the played_game table
+/// Represents a record in the played_game table
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PlayedGame {
     pub id: GameId,
@@ -135,7 +135,15 @@ pub struct PlayedGame {
     pub recorded: DateTime<Utc>,
 }
 
-// Represents a record in the game_details table
+/// Represents a record in the wishlist table, matching the steam wishlist
+#[derive(Clone, Debug, PartialEq)]
+pub struct WishlistedGame {
+    pub id: GameId,
+    pub wishlisted: DateTime<Utc>,
+    pub deleted: Option<DateTime<Utc>>,
+}
+
+/// Represents a record in the game_details table
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct GameDetails {
     pub id: GameId,
@@ -150,7 +158,7 @@ pub struct GameDetails {
     pub recorded: DateTime<Utc>,
 }
 
-// Represents details of a game newly released and in need of update in notion
+/// Represents details of a game newly released and in need of update in notion
 #[derive(Debug)]
 pub struct ReleasedGame {
     pub note_id: String,

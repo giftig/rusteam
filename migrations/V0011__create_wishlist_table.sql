@@ -1,0 +1,9 @@
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS wishlist (
+  app_id BIGINT PRIMARY KEY REFERENCES steam_game(app_id),
+  wishlisted TIMESTAMP NOT NULL,
+  deleted TIMESTAMP DEFAULT NULL
+);
+
+COMMIT;

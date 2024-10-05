@@ -7,7 +7,7 @@ use itertools::Itertools;
 use thiserror::Error;
 use tokio_postgres::{Client, Error as PgError};
 
-use crate::models::game::{GameDetails, GameId, NotedGame, PlayedGame, ReleasedGame};
+use crate::models::game::*;
 
 #[derive(Error, Debug)]
 pub enum RepoError {
@@ -78,7 +78,7 @@ pub trait OwnedGamesHandling {
 }
 
 pub trait GameDetailsHandling {
-    async fn get_owned_games_missing_details(&self) -> Result<Vec<GameId>>;
+    async fn get_games_missing_details(&self) -> Result<Vec<GameId>>;
     async fn insert_game_details(&self, details: &[GameDetails]) -> Result<()>;
     async fn mark_game_detail_failures(&self, games: &[GameId]) -> ();
     async fn get_release_dates(&self, games: &[&GameId]) -> Result<HashMap<GameId, String>>;
@@ -93,6 +93,11 @@ pub trait NotedGamesHandling {
     async fn get_appids_by_name<T: AsRef<str>>(&self, names: &[T]) -> Result<HashMap<String, GameId>>;
     async fn get_upcoming_noted_game_ids(&self) -> Result<Vec<GameId>>;
     async fn get_newly_released_games(&self) -> Result<Vec<ReleasedGame>>;
+}
+
+pub trait WishlistHandling {
+    async fn update_wishlist(&self, items: &[WishlistedGame]) -> Result<()>;
+    async fn get_upcoming_wishlisted_game_ids(&self) -> Result<Vec<GameId>>;
 }
 
 impl SteamGamesHandling for Repo {
@@ -117,7 +122,9 @@ impl SteamGamesHandling for Repo {
 }
 
 impl GameDetailsHandling for Repo {
-    async fn get_owned_games_missing_details(&self) -> Result<Vec<GameId>> {
+    /// Get games which are being tracked and are missing in the game_details table
+    /// Tracked games means those owned or wishlisted
+    async fn get_games_missing_details(&self) -> Result<Vec<GameId>> {
         // Limit results to 100 to avoid backfilling hundreds of games at once; we can catch up
         // 100 at a time over several syncs this way.
         // This is just a very basic way of avoiding hitting the Steam API rate limit
@@ -125,17 +132,18 @@ impl GameDetailsHandling for Repo {
         // N.B. we also join to game_details_blacklist to avoid repeatedly scraping games for
         // which steam doesn't return a well-formed definition
         let q = r#"
+            WITH tracked AS (SELECT app_id FROM owned_game UNION SELECT app_id FROM wishlist)
             SELECT
-                o.app_id
+                tracked.app_id
             FROM
-                owned_game o
-                LEFT JOIN game_details d ON o.app_id = d.app_id
-                LEFT JOIN game_details_blacklist b ON o.app_id = b.app_id
+                tracked
+                LEFT JOIN game_details details ON tracked.app_id = details.app_id
+                LEFT JOIN game_details_blacklist blacklist ON tracked.app_id = blacklist.app_id
             WHERE
-                d.app_id IS NULL AND
+                details.app_id IS NULL AND
                 (
-                    b.failure_count < 5 OR
-                    b.failure_count IS NULL
+                    blacklist.failure_count < 5 OR
+                    blacklist.failure_count IS NULL
                 )
             LIMIT
                 100
@@ -347,12 +355,12 @@ impl NotedGamesHandling for Repo {
         )
     }
 
+    /// Retrieve upcoming noted games by checking the game_details table for release state
     async fn get_upcoming_noted_game_ids(&self) -> Result<Vec<GameId>> {
         let q = r#"
-            SELECT app_id FROM noted_game
-            WHERE
-                app_id IS NOT NULL AND
-                (state IS NULL OR state IN ('No release', 'Upcoming'))
+            SELECT ng.app_id
+            FROM noted_game ng LEFT JOIN game_details gd ON ng.app_id = gd.app_id
+            WHERE gd.is_released = FALSE
         "#;
 
         Ok(
@@ -384,6 +392,95 @@ impl NotedGamesHandling for Repo {
                 .query(q, &[]).await?
                 .into_iter()
                 .map(|row| ReleasedGame { note_id: row.get(0), name: row.get(1) })
+                .collect()
+        )
+    }
+}
+
+impl Repo {
+    async fn get_wishlisted_ids(&self) -> Result<HashSet<GameId>> {
+        let q = r#"SELECT app_id FROM wishlist WHERE deleted IS NULL"#;
+
+        Ok(
+            self.db
+                .query(q, &[]).await?
+                .into_iter()
+                .map(|row| GameId::from(row.get::<usize, i64>(0)))
+                .collect()
+        )
+    }
+
+    async fn delete_wishlist_ids(&self, ids: &[&GameId]) -> Result<()> {
+        let now = Utc::now().naive_utc();
+        let q = r#"UPDATE wishlist SET deleted = NOW() WHERE app_id = ANY ($1)"#;
+
+        self.db
+            .execute(
+                q,
+                &[
+                    &ids.iter().map(|&id| Into::<i64>::into(id.clone())).collect::<Vec<_>>(),
+                    &now,
+                ]
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn insert_wishlist_items(&self, items: &[WishlistedGame]) -> Result<()> {
+        // If an item was deleted and readded, unmark as deleted but keep original add date
+        let q = r#"
+            INSERT INTO wishlist (app_id, wishlisted) VALUES ($1, $2)
+            ON CONFLICT (app_id) DO UPDATE SET deleted = NULL
+        "#;
+
+        for item in items {
+            self.db
+                .execute(q, &[&Into::<i64>::into(item.id.clone()), &item.wishlisted.naive_utc()])
+                .await?;
+        }
+        Ok(())
+    }
+}
+
+impl WishlistHandling for Repo {
+    /// Sync the wishlist by marking removed items as deleted and then inserting missing items
+    // TODO: it'd be best to do this transactionally, see link above
+    async fn update_wishlist(&self, items: &[WishlistedGame]) -> Result<()> {
+        let existing_ids = self.get_wishlisted_ids().await?;
+        let new_ids: HashSet<GameId> = items.iter().map(|item| item.id.clone()).collect();
+        let remove_ids: Vec<&GameId> = existing_ids.difference(&new_ids).collect();
+
+        println!("Marking {} wishlist items as deleted...", remove_ids.len());
+        if !remove_ids.is_empty() {
+            self.delete_wishlist_ids(&remove_ids).await?;
+        }
+
+        let new_items: Vec<WishlistedGame> = {
+            items.iter().cloned().filter(|item| !existing_ids.contains(&item.id)).collect()
+        };
+
+        println!("Inserting {} new wishlist items...", new_items.len());
+        if !new_items.is_empty() {
+            self.insert_wishlist_items(&new_items).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Retrieve upcoming wishlisted games by checking the game_details table for release state
+    async fn get_upcoming_wishlisted_game_ids(&self) -> Result<Vec<GameId>> {
+        let q = r#"
+            SELECT w.app_id
+            FROM wishlist w LEFT JOIN game_details gd ON w.app_id = gd.app_id
+            WHERE gd.is_released = FALSE
+        "#;
+
+        Ok(
+            self.db
+                .query(q, &[]).await?
+                .into_iter()
+                .map(|row| GameId::from(row.get::<usize, i64>(0)))
                 .collect()
         )
     }

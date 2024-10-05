@@ -1,6 +1,9 @@
 use super::*;
 
+use std::fs;
+
 use chrono::{TimeZone, Utc};
+use serde_json;
 
 use crate::models::game::{GameId, GameDetails};
 use crate::models::steam::*;
@@ -33,7 +36,7 @@ fn local_coop_categories() -> Vec<Category> {
     ]
 }
 
-fn fixture(categories: Vec<Category>, released: bool) -> SteamAppDetails {
+fn details_fixture(categories: Vec<Category>, released: bool) -> SteamAppDetails {
     SteamAppDetails {
         short_description: Some("Game buying simulator".to_string()),
         controller_support: Some("full".to_string()),
@@ -51,7 +54,7 @@ fn fixture(categories: Vec<Category>, released: bool) -> SteamAppDetails {
 #[test]
 fn convert_steam_details_released() {
     let id = GameId { app_id: 666666 };
-    let fix = fixture(vec![], true);
+    let fix = details_fixture(vec![], true);
     let now = Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap();
 
     let expected = GameDetails {
@@ -75,7 +78,7 @@ fn convert_steam_details_released() {
 #[test]
 fn convert_steam_details_coming_soon() {
     let id = GameId { app_id: 666666 };
-    let fix = fixture(vec![], false);
+    let fix = details_fixture(vec![], false);
     let now = Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap();
 
     let expected = GameDetails {
@@ -99,7 +102,7 @@ fn convert_steam_details_coming_soon() {
 #[test]
 fn convert_steam_details_remote_coop() {
     let id = GameId { app_id: 666666 };
-    let fix = fixture(generic_coop_categories(), false);
+    let fix = details_fixture(generic_coop_categories(), false);
     let now = Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap();
 
     let expected = GameDetails {
@@ -123,7 +126,7 @@ fn convert_steam_details_remote_coop() {
 #[test]
 fn convert_steam_details_local_coop() {
     let id = GameId { app_id: 666666 };
-    let fix = fixture(local_coop_categories(), false);
+    let fix = details_fixture(local_coop_categories(), false);
     let now = Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap();
 
     let expected = GameDetails {
@@ -166,4 +169,34 @@ fn parse_release_date_month_year() {
     let actual = parse_release_date("Apr 2025");
 
     assert_eq!(actual, Some(expected));
+}
+
+#[test]
+fn extract_wishlist_valid() {
+    let fixture = {
+        let filename = "test/fixtures/wishlist/wishlist-1.json";
+        serde_json::from_str(&fs::read_to_string(&filename).unwrap()).unwrap()
+    };
+
+    let expected = vec![
+        WishlistedGame {
+            id: GameId { app_id: 1093810 },
+            wishlisted: Utc.with_ymd_and_hms(2019, 10, 11, 6, 24, 8).unwrap(),
+            deleted: None,
+        },
+        WishlistedGame {
+            id: GameId { app_id: 1125510 },
+            wishlisted: Utc.with_ymd_and_hms(2024, 2, 9, 8, 26, 41).unwrap(),
+            deleted: None,
+        },
+        WishlistedGame {
+            id: GameId { app_id: 1145350 },
+            wishlisted: Utc.with_ymd_and_hms(2023, 12, 6, 7, 48, 49).unwrap(),
+            deleted: None,
+        },
+    ];
+    let mut actual = extract_wishlist(&fixture).unwrap();
+    actual.sort_by_key(|item| item.id.app_id);
+
+    assert_eq!(actual, expected);
 }
