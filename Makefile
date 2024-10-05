@@ -5,6 +5,9 @@ DB_PASSWORD := admin
 bootstrap:
 	@./scripts/bootstrap.sh
 
+run-sync: bootstrap
+	cargo run -- sync
+
 destroy:
 	docker compose down --volumes
 
