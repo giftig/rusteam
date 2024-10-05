@@ -8,9 +8,7 @@ mod steam;
 
 use tokio;
 
-use crate::cli::run;
-
 #[tokio::main]
 async fn main() {
-    run().await;
+    cli::cli_main().await;
 }
