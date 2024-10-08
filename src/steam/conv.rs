@@ -31,7 +31,7 @@ fn parse_release_date(s: &str) -> Option<DateTime<Utc>> {
         return None;
     }
 
-    let clean = s.replace(",", "").trim().to_owned();
+    let mut clean = s.replace(",", "").trim().to_owned();
 
     // Basic exact day format used by Steam is like "5 Jan, 2020"
     if let Ok(d) = NaiveDate::parse_from_str(&clean, "%d %b %Y") {
@@ -44,7 +44,28 @@ fn parse_release_date(s: &str) -> Option<DateTime<Utc>> {
         return Utc.with_ymd_and_hms(year + 1, 1, 1, 0, 0, 0).single();
     }
 
-    // TODO: Look for month and year like "Mar 2025". Unfortunately chrono doesn't help us much
+    // Parse strings representing a quarter, e.g. "Q2 2025", by substituting the Qx part with the
+    // last month in that quarter. It'll then be caught by the "monthly" case below.
+    if clean.starts_with("Q") {
+        let quarter = s.chars().nth(1)?;
+        let month = match quarter {
+            '1' => Some("Mar"),
+            '2' => Some("Jun"),
+            '3' => Some("Sep"),
+            '4' => Some("Dec"),
+            _ => None
+        }?;
+        let remainder = &clean[3..];
+
+        let mut buf = "".to_string();
+        buf.push_str(&month);
+        buf.push_str(" ");
+        buf.push_str(&remainder);
+
+        clean = buf;
+    }
+
+    // Look for month and year like "Mar 2025". Unfortunately chrono doesn't help us much
     // here because it refuses to parse an imprecise date like this even into a NaiveDate, so we'll
     // try sticking a 1 before it and parsing it as above, then adding a month.
     if let Ok(d) = NaiveDate::parse_from_str(&format!("1 {}", &clean), "%d %b %Y") {

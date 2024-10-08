@@ -172,6 +172,14 @@ fn parse_release_date_month_year() {
 }
 
 #[test]
+fn parse_release_date_quarter() {
+    let expected = Utc.with_ymd_and_hms(2025, 7, 1, 0, 0, 0).unwrap();
+    let actual = parse_release_date("Q2 2025");
+
+    assert_eq!(actual, Some(expected));
+}
+
+#[test]
 fn extract_wishlist_valid() {
     let fixture = {
         let filename = "test/fixtures/wishlist/wishlist-1.json";
