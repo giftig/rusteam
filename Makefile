@@ -11,7 +11,7 @@ run-sync: bootstrap
 destroy:
 	docker compose down --volumes
 
-superset-up:
+superset-up: bootstrap
 	cd superset && docker compose up -d
 
 superset-down:
