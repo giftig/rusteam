@@ -25,9 +25,9 @@ type Result<T> = std::result::Result<T, ImportError>;
 #[derive(Debug, Parser)]
 pub(super) struct ImportFromFile {
     /// File containing wishlist data fetched from steam's web APIs
-    /// This can be retrieved manually via browser or curl; we don't try to do it directly here as
-    /// authentication will be problematic given there's mfa involved and steam doesn't expose
-    /// these APIs for public use.
+    // This can be retrieved manually via browser or curl; we don't try to do it directly here as
+    // authentication will be problematic given there's mfa involved and steam doesn't expose
+    // these APIs for public use.
     #[arg(short, long)]
     file: String,
 }
