@@ -162,5 +162,5 @@ pub struct GameDetails {
 #[derive(Debug)]
 pub struct ReleasedGame {
     pub note_id: String,
-    pub name: String,
+    pub game_id: GameId,
 }

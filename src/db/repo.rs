@@ -23,6 +23,7 @@ pub struct Repo {
     db: Client
 }
 
+// FIXME: Fix inconsistent naming of app_id, appid, id, game_id, etc.
 impl Repo {
     pub fn new(db: Client) -> Repo {
         Repo { db: db }
@@ -71,6 +72,7 @@ impl Repo {
 
 pub trait SteamGamesHandling {
     async fn insert_steam_games<T: AsRef<str>>(&self, games: HashMap<u32, T>) -> Result<()>;
+    async fn get_game_names_by_id(&self, ids: &[GameId]) -> Result<HashMap<GameId, String>>;
 }
 
 pub trait OwnedGamesHandling {
@@ -118,6 +120,19 @@ impl SteamGamesHandling for Repo {
             }
         }
         Ok(())
+    }
+
+    async fn get_game_names_by_id(&self, ids: &[GameId]) -> Result<HashMap<GameId, String>> {
+        let q = r#"SELECT app_id, name FROM steam_game WHERE app_id = ANY ($1)"#;
+
+        Ok(
+            self.db
+                .query(q, &[&ids.iter().map(|&id| Into::<i64>::into(id.clone())).collect::<Vec<_>>()])
+                .await?
+                .into_iter()
+                .map(|row| (GameId::from(row.get::<usize, i64>(0)), row.get(1)))
+                .collect()
+        )
     }
 }
 
@@ -376,11 +391,10 @@ impl NotedGamesHandling for Repo {
         let q = r#"
             SELECT
                 ng.note_id,
-                sg.name
+                ng.app_id
             FROM
                 noted_game ng
                 LEFT JOIN game_details gd ON ng.app_id = gd.app_id
-                LEFT JOIN steam_game sg ON ng.app_id = sg.app_id
             WHERE
                 ng.app_id IS NOT NULL AND
                 (ng.state IS NULL OR ng.state IN ('No release', 'Upcoming')) AND
@@ -391,7 +405,12 @@ impl NotedGamesHandling for Repo {
             self.db
                 .query(q, &[]).await?
                 .into_iter()
-                .map(|row| ReleasedGame { note_id: row.get(0), name: row.get(1) })
+                .map(|row| {
+                    ReleasedGame {
+                        note_id: row.get(0),
+                        game_id: GameId::from(row.get::<usize, i64>(1)),
+                    }
+                })
                 .collect()
         )
     }

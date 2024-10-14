@@ -6,7 +6,6 @@ use thiserror::Error;
 use crate::db::repo::*;
 use crate::models::game::{GameId, GameDetails, GameState, NotedGame, PlayedGame};
 use crate::models::notion::GameNote;
-use crate::notify::{Notification, NotificationHandling};
 use crate::notion::{NotionError, NotionGamesRepo};
 use crate::steam::*;
 
@@ -20,36 +19,39 @@ pub enum SyncError {
     Steam(#[from] SteamError),
 }
 
+pub enum SyncEvent {
+    ReleaseDateUpdated { game: GameId, prev: String, updated: String },
+    Released { game: GameId },
+}
+
 pub type Result<T> = std::result::Result<T, SyncError>;
 
 // TODO: Split into SteamSync + NotionSync and abstract over the top for better organisation
-pub struct Sync<'a> {
+pub struct Sync {
     steam_account_id: String,
-    repo: Repo,
+    // FIXME: Should avoid exposing this, but this may mean Sync shouldn't own it.
+    pub repo: Repo,
     steam: SteamClient,
     notion: NotionGamesRepo,
-    notifier: &'a mut dyn NotificationHandling
 }
 
-impl Sync<'_> {
-    pub fn new<'a>(
+impl Sync {
+    pub fn new(
         steam_account_id: &str,
         repo: Repo,
         steam: SteamClient,
         notion: NotionGamesRepo,
-        notifier: &'a mut dyn NotificationHandling
-    ) -> Sync<'a> {
+    ) -> Sync {
         Sync {
             steam_account_id: steam_account_id.to_string(),
             repo: repo,
             steam: steam,
             notion: notion,
-            notifier: notifier
         }
     }
 }
 
-impl Sync<'_> {
+impl Sync {
     async fn sync_steam_games(&self) -> Result<()> {
         let all_games: HashMap<u32, String> = self.steam
             .get_all_games()?
@@ -91,11 +93,12 @@ impl Sync<'_> {
 
     // Check if updated game details entries contain a change to release dates and
     // notify via the log what these changes were
-    async fn check_updated_release_dates(&mut self, games: &[&GameDetails]) -> Result<()> {
+    async fn check_updated_release_dates(&self, games: &[&GameDetails]) -> Result<Vec<SyncEvent>> {
         println!("Checking for updated release dates...");
 
         let ids: Vec<&GameId> = games.iter().map(|&g| &g.id).collect();
         let previous_release_dates: HashMap<GameId, String> = self.repo.get_release_dates(&ids).await?;
+        let mut updates: Vec<SyncEvent> = vec![];
 
         for g in games {
             match (previous_release_dates.get(&g.id), &g.release_date) {
@@ -104,21 +107,23 @@ impl Sync<'_> {
                     // as currently the actual release notifications will only affected noted
                     // games, not wishlisted ones.
                     if prev != curr {
-                        self.notifier.enqueue(Notification::ReleaseDateUpdated {
-                            game: g.id.clone(),
-                            prev: prev.clone(),
-                            updated: curr.clone()
-                        });
+                        updates.push(
+                            SyncEvent::ReleaseDateUpdated {
+                                game: g.id.clone(),
+                                prev: prev.clone(),
+                                updated: curr.clone()
+                            }
+                        );
                     }
                 _ =>
                     ()
             }
         }
 
-        Ok(())
+        Ok(updates)
     }
 
-    async fn sync_game_details(&mut self) -> Result<()> {
+    async fn sync_game_details(&mut self) -> Result<Vec<SyncEvent>> {
         let missing_games = self.repo.get_games_missing_details().await?;
         let noted_games = self.repo.get_upcoming_noted_game_ids().await?;
         let wishlisted_games = self.repo.get_upcoming_wishlisted_game_ids().await?;
@@ -147,25 +152,30 @@ impl Sync<'_> {
             }
         }
 
-        if let Err(e) = self.check_updated_release_dates(&tracked_details).await {
-            eprintln!("Failed to check for updated release dates: {}", e)
-        }
+        let events = match self.check_updated_release_dates(&tracked_details).await {
+            Ok(evts) => evts,
+            Err(e) => {
+                eprintln!("Failed to check for updated release dates: {}", e);
+                vec![]
+            },
+        };
 
         self.repo.insert_game_details(&details).await?;
         self.repo.mark_game_detail_failures(&failures).await;
-        Ok(())
+        Ok(events)
     }
 
-    pub async fn sync_steam(&mut self) -> Result<()> {
+    pub async fn sync_steam(&mut self) -> Result<Vec<SyncEvent>> {
         self.sync_steam_games().await?;
-        self.sync_game_details().await?;
+        let events = self.sync_game_details().await?;
         self.sync_owned_games().await?;
         self.sync_played_games().await?;
-        Ok(())
+
+        Ok(events)
     }
 }
 
-impl Sync<'_> {
+impl Sync {
     fn write_app_ids_to_notion(
         &self,
         missing: &[(String, String)],
@@ -228,18 +238,20 @@ impl Sync<'_> {
             .collect()
     }
 
-    async fn update_release_states(&mut self) -> Result<()> {
+    async fn update_release_states(&mut self) -> Result<Vec<SyncEvent>> {
         let updated_games = self.repo.get_newly_released_games().await?;
+        let mut events: Vec<SyncEvent> = vec![];
 
-        for game in updated_games {
+        for record in updated_games {
             // FIXME: Use appid, let notifier resolve name
-            self.notifier.enqueue(Notification::Released { game: game.name.clone() });
-            self.notion.set_state(&game.note_id, &GameState::Released)?;
+            events.push(SyncEvent::Released { game: record.game_id.clone() });
+
+            self.notion.set_state(&record.note_id, &GameState::Released)?;
         }
-        Ok(())
+        Ok(events)
     }
 
-    pub async fn sync_notion(&mut self) -> Result<()> {
+    pub async fn sync_notion(&mut self) -> Result<Vec<SyncEvent>> {
         let notes = self.notion.get_notes().await?;
 
         let missing_app_ids = Self::missing_app_ids(&notes);
@@ -250,12 +262,10 @@ impl Sync<'_> {
 
         self.repo.insert_noted_games(&noted_games).await?;
         self.write_app_ids_to_notion(&missing_app_ids, &found_app_ids)?;
-        self.update_release_states().await?;
 
         // TODO: Populate game tags in postgres
         // Try using fuzzy matching to look up app ids by fuzzy name search
         // N.B. Postgres can do levenshtein directly, just need CREATE EXTENSION IF NOT EXISTS fuzzystrmatch
-
-        Ok(())
+        Ok(self.update_release_states().await?)
     }
 }

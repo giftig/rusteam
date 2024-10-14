@@ -2,7 +2,6 @@ mod cli;
 mod config;
 mod db;
 mod models;
-mod notify;
 mod notion;
 mod steam;
 
