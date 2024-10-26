@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use home::home_dir;
 use serde::Deserialize;
 use serde_inline_default::serde_inline_default;
@@ -58,9 +60,15 @@ pub struct Notion {
 }
 
 
-pub fn read() -> Config {
-    let mut f = home_dir().expect("Failed to load config: could not determine home dir");
-    f.push(".rusteam/config.toml");
+pub fn read<P: AsRef<Path>>(path: Option<&P>) -> Config {
+    let f = match path {
+        Some(p) => p.as_ref().to_owned(),
+        None => {
+            let mut p = home_dir().expect("Failed to load config: could not determine home dir");
+            p.push(".rusteam/config.toml");
+            p
+        }
+    };
 
     let raw = std::fs::read_to_string(&f).expect("Failed to read config file");
     toml::from_str(&raw).expect("Failed to parse config file")

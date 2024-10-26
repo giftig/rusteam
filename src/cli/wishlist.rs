@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::PathBuf;
 
 use clap::Parser;
 use thiserror::Error;
@@ -30,11 +31,13 @@ pub(super) struct ImportFromFile {
     // these APIs for public use.
     #[arg(short, long)]
     file: String,
+    #[arg(short, long)]
+    config_file: Option<PathBuf>,
 }
 
 impl ImportFromFile {
     pub(super) async fn run(&self) -> Result<()> {
-        let conf = config::read();
+        let conf = config::read(self.config_file.as_ref());
         let mut db_client = db::connect(&conf.db.connection_string()).await;
         db::migrate(&mut db_client).await;
 

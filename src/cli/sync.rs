@@ -1,6 +1,7 @@
 use clap::Parser;
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use crate::config;
 use crate::db;
@@ -11,7 +12,10 @@ use crate::models::game::GameId;
 use crate::steam::SteamClient;
 
 #[derive(Debug, Parser)]
-pub struct RunSync {}
+pub struct RunSync {
+    #[arg(short, long)]
+    config_file: Option<PathBuf>,
+}
 
 pub struct SyncReport {
     repo: Repo,
@@ -93,10 +97,9 @@ impl SyncReport {
 }
 
 impl RunSync {
-
     /// Primary rusteam action: sync data from the official steam API and notion
     pub(super) async fn run(&self) {
-        let conf = config::read();
+        let conf = config::read(self.config_file.as_ref());
 
         let mut db_client = db::connect(&conf.db.connection_string()).await;
         db::migrate(&mut db_client).await;
