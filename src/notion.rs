@@ -28,15 +28,18 @@ pub type Result<T> = std::result::Result<T, NotionError>;
 pub struct NotionGamesRepo {
     api: NotionApi,
     database_id: String,
-    api_key: String
+    api_key: String,
+    api_host: String,
 }
 
 impl NotionGamesRepo {
-    pub fn new(api_key: &str, database_id: &str) -> NotionGamesRepo {
+    pub fn new(api_key: &str, database_id: &str, api_host: &str) -> NotionGamesRepo {
         NotionGamesRepo {
+            // FIXME: Need to take this / abstract over it to allow mocking
             api: NotionApi::new(api_key.to_string()).unwrap(),
             database_id: database_id.to_string(),
-            api_key: api_key.to_string()
+            api_key: api_key.to_string(),
+            api_host: api_host.to_string(),
         }
     }
 
@@ -62,11 +65,9 @@ impl NotionGamesRepo {
 
     fn update_row(&self, note_id: &str, props: HashMap<String, PropertyValue>) -> Result<()> {
         let body = UpdatePage { properties: Properties { properties: props } };
-//        println!("{}", serde_json::to_string(&body).unwrap());
-//        return Ok(());
 
         // Notion crate doesn't support this operation so we'll do it directly with ureq
-        let url = format!("https://api.notion.com/v1/pages/{}", note_id);
+        let url = format!("{}/v1/pages/{}", &self.api_host, note_id);
         ureq::patch(&url)
             .set("Authorization", &format!("Bearer {}", self.api_key))
             .set("Content-Type", "application/json")

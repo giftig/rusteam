@@ -35,15 +35,21 @@ pub trait SteamAppDetailsHandling {
 
 pub struct SteamClient {
     api_key: String,
+    api_host: String,  // https://api.steampowered.com
+    store_host: String, // https://store.steampowered.com
 }
 
 impl SteamClient {
-    pub fn new(api_key: &str) -> SteamClient {
-        SteamClient { api_key: api_key.to_string() }
+    pub fn new(api_key: &str, api_host: &str, store_host: &str) -> SteamClient {
+        SteamClient {
+            api_key: api_key.to_string(),
+            api_host: api_host.to_string(),
+            store_host: store_host.to_string(),
+        }
     }
 
     fn get_owned_games_internal(&self, account_id: &str) -> Result<SteamOwnedGamesResponse> {
-        let req = ureq::get("https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/")
+        let req = ureq::get(&format!("{}/IPlayerService/GetOwnedGames/v0001/", self.api_host))
             .query("key", &self.api_key)
             .query("steamid", &account_id);
 
@@ -83,7 +89,7 @@ impl SteamPlayerServiceHandling for SteamClient {
 
 impl SteamAppsServiceHandling for SteamClient {
     fn get_all_games(&self) -> Result<Vec<SteamAppIdPair>> {
-        let req = ureq::get("https://api.steampowered.com/ISteamApps/GetAppList/v2/");
+        let req = ureq::get(&format!("{}/ISteamApps/GetAppList/v2/", &self.api_host));
         let res = req.call()?.into_json::<SteamAllGamesResponse>()?;
 
         Ok(res.applist.apps)
@@ -101,7 +107,7 @@ impl SteamClient {
             let appid: String = id.into();
 
             let req = {
-                ureq::get("https://store.steampowered.com/api/appdetails")
+                ureq::get(&format!("{}/api/appdetails", &self.store_host))
                     .query("currency", "GBP")
                     .query("appids", &appid)
             };

@@ -105,8 +105,16 @@ impl RunSync {
         db::migrate(&mut db_client).await;
 
         let repo = Repo::new(db_client);
-        let steam_client = SteamClient::new(&conf.steam.api_key);
-        let notion = NotionGamesRepo::new(&conf.notion.api_key, &conf.notion.database_id);
+        let steam_client = SteamClient::new(
+            &conf.steam.api_key,
+            &conf.steam.api_hoststring,
+            &conf.steam.store_hoststring
+        );
+        let notion = NotionGamesRepo::new(
+            &conf.notion.api_key,
+            &conf.notion.database_id,
+            &conf.notion.api_hoststring
+        );
 
         let mut sync = Sync::new(&conf.steam.user_id, repo, steam_client, notion);
 
