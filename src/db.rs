@@ -5,7 +5,7 @@ pub mod sync;
 use tokio_postgres::{Client, NoTls};
 
 /// Run migrations or panic. Most subcommands should run this immediately on execution.
-pub(crate) async fn migrate(db_client: &mut Client) -> () {
+pub async fn migrate(db_client: &mut Client) -> () {
     match migrations::run(db_client).await {
         Ok(report) => {
             let count = report.applied_migrations().len();
@@ -18,7 +18,7 @@ pub(crate) async fn migrate(db_client: &mut Client) -> () {
 }
 
 /// Connect to postgres and report any connection errors as async
-pub(crate) async fn connect(connection_string: &str) -> Client {
+pub async fn connect(connection_string: &str) -> Client {
     let (db_client, conn) = tokio_postgres::connect(connection_string, NoTls).await.unwrap();
     tokio::spawn(async move {
         if let Err(e) = conn.await {

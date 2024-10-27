@@ -116,7 +116,7 @@ impl RunSync {
             &conf.notion.api_hoststring
         );
 
-        let mut sync = Sync::new(&conf.steam.user_id, repo, steam_client, notion);
+        let mut sync = Sync::new(&conf.steam.user_id, repo, Box::new(steam_client), Box::new(notion));
 
         let mut events = sync.sync_steam().await.unwrap();
         events.extend(sync.sync_notion().await.unwrap());

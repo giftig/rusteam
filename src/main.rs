@@ -1,11 +1,5 @@
-mod cli;
-mod config;
-mod db;
-mod models;
-mod notion;
-mod steam;
-
 use tokio;
+use rusteam::cli;
 
 #[tokio::main]
 async fn main() {

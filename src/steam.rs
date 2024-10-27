@@ -33,6 +33,12 @@ pub trait SteamAppDetailsHandling {
     fn get_game_details(&self, ids: &[GameId]) -> Result<(Vec<GameDetails>, Vec<GameId>)>;
 }
 
+
+pub trait SteamHandling:
+    SteamPlayerServiceHandling +
+    SteamAppsServiceHandling +
+    SteamAppDetailsHandling {}
+
 pub struct SteamClient {
     api_key: String,
     api_host: String,  // https://api.steampowered.com
@@ -153,3 +159,5 @@ impl SteamAppDetailsHandling for SteamClient {
         )
     }
 }
+
+impl SteamHandling for SteamClient {}

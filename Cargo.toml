@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+async-trait = "0.1.83"
 chrono = { version = "0.4.38", features = ["now", "serde"] }
 clap = { version = "4.5.17", features = ["derive"] }
 futures = "0.3.30"
@@ -21,3 +22,7 @@ tokio = { version = "1", features = ["full"] }
 tokio-postgres = "0.7.10"
 toml = "0.8.8"
 ureq = { version = "2.9.1", features = ["json"] }
+
+[dev-dependencies]
+mockall = "0.13.0"
+wiremock = "0.6.2"

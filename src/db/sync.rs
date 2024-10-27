@@ -6,7 +6,7 @@ use thiserror::Error;
 use crate::db::repo::*;
 use crate::models::game::{GameId, GameDetails, GameState, NotedGame, PlayedGame};
 use crate::models::notion::GameNote;
-use crate::notion::{NotionError, NotionGamesRepo};
+use crate::notion::{NotionError, NotionHandling};
 use crate::steam::*;
 
 #[derive(Error, Debug)]
@@ -31,22 +31,22 @@ pub struct Sync {
     steam_account_id: String,
     // FIXME: Should avoid exposing this, but this may mean Sync shouldn't own it.
     pub repo: Repo,
-    steam: SteamClient,
-    notion: NotionGamesRepo,
+    steam: Box<dyn SteamHandling>,
+    notion: Box<dyn NotionHandling>
 }
 
 impl Sync {
     pub fn new(
         steam_account_id: &str,
         repo: Repo,
-        steam: SteamClient,
-        notion: NotionGamesRepo,
+        steam: Box<dyn SteamHandling>,
+        notion: Box<dyn NotionHandling>,
     ) -> Sync {
         Sync {
             steam_account_id: steam_account_id.to_string(),
             repo: repo,
             steam: steam,
-            notion: notion,
+            notion: notion
         }
     }
 }
@@ -167,8 +167,8 @@ impl Sync {
 
     pub async fn sync_steam(&mut self) -> Result<Vec<SyncEvent>> {
         self.sync_steam_games().await?;
-        let events = self.sync_game_details().await?;
         self.sync_owned_games().await?;
+        let events = self.sync_game_details().await?;
         self.sync_played_games().await?;
 
         Ok(events)

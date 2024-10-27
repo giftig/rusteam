@@ -3,6 +3,8 @@ mod conv;
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use async_trait::async_trait;
+
 use ::notion::NotionApi;
 use ::notion::ids::DatabaseId;
 use ::notion::models::Properties;
@@ -25,6 +27,13 @@ pub enum NotionError {
 }
 pub type Result<T> = std::result::Result<T, NotionError>;
 
+#[async_trait]
+pub trait NotionHandling {
+    async fn get_notes(&self) -> Result<Vec<GameNote>>;
+    fn set_game_details(&self, note_id: &str, app_id: &str, name: &str) -> Result<()>;
+    fn set_state(&self, note_id: &str, state: &GameState) -> Result<()>;
+}
+
 pub struct NotionGamesRepo {
     api: NotionApi,
     database_id: String,
@@ -35,7 +44,6 @@ pub struct NotionGamesRepo {
 impl NotionGamesRepo {
     pub fn new(api_key: &str, database_id: &str, api_host: &str) -> NotionGamesRepo {
         NotionGamesRepo {
-            // FIXME: Need to take this / abstract over it to allow mocking
             api: NotionApi::new(api_key.to_string()).unwrap(),
             database_id: database_id.to_string(),
             api_key: api_key.to_string(),
@@ -43,7 +51,24 @@ impl NotionGamesRepo {
         }
     }
 
-    pub async fn get_notes(&self) -> Result<Vec<GameNote>> {
+    fn update_row(&self, note_id: &str, props: HashMap<String, PropertyValue>) -> Result<()> {
+        let body = UpdatePage { properties: Properties { properties: props } };
+
+        // Notion crate doesn't support this operation so we'll do it directly with ureq
+        let url = format!("{}/v1/pages/{}", &self.api_host, note_id);
+        ureq::patch(&url)
+            .set("Authorization", &format!("Bearer {}", self.api_key))
+            .set("Content-Type", "application/json")
+            .set("Notion-Version", "2022-06-28")
+            .send_json(&body)?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl NotionHandling for NotionGamesRepo {
+    async fn get_notes(&self) -> Result<Vec<GameNote>> {
         let db_id = DatabaseId::from_str(&self.database_id)?;
 
         Ok(
@@ -63,21 +88,7 @@ impl NotionGamesRepo {
         )
     }
 
-    fn update_row(&self, note_id: &str, props: HashMap<String, PropertyValue>) -> Result<()> {
-        let body = UpdatePage { properties: Properties { properties: props } };
-
-        // Notion crate doesn't support this operation so we'll do it directly with ureq
-        let url = format!("{}/v1/pages/{}", &self.api_host, note_id);
-        ureq::patch(&url)
-            .set("Authorization", &format!("Bearer {}", self.api_key))
-            .set("Content-Type", "application/json")
-            .set("Notion-Version", "2022-06-28")
-            .send_json(&body)?;
-
-        Ok(())
-    }
-
-    pub fn set_game_details(&self, note_id: &str, app_id: &str, name: &str) -> Result<()> {
+    fn set_game_details(&self, note_id: &str, app_id: &str, name: &str) -> Result<()> {
         println!("Setting details in notion for game {}: {}", app_id, name);
 
         let props: HashMap<String, PropertyValue> = HashMap::from([
@@ -88,7 +99,7 @@ impl NotionGamesRepo {
         Ok(self.update_row(note_id, props)?)
     }
 
-    pub fn set_state(&self, note_id: &str, state: &GameState) -> Result<()> {
+    fn set_state(&self, note_id: &str, state: &GameState) -> Result<()> {
         let pretty_state: String = state.to_owned().into();
         println!("Setting state in notion: game {} = {}", note_id, &pretty_state);
 
