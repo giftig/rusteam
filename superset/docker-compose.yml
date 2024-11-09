@@ -34,7 +34,6 @@ x-superset-networks: &superset-networks
   - default
   - rusteam-public
 
-version: "3.7"
 services:
   redis:
     image: redis:7
