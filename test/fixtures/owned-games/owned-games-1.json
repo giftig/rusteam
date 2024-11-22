@@ -1,0 +1,37 @@
+{
+  "response": {
+    "game_count": 3,
+    "games": [
+      {
+        "appid": 666,
+        "playtime_deck_forever": 0,
+        "playtime_disconnected": 0,
+        "playtime_forever": 100,
+        "playtime_linux_forever": 0,
+        "playtime_mac_forever": 0,
+        "playtime_windows_forever": 0,
+        "rtime_last_played": 0
+      },
+      {
+        "appid": 1337,
+        "playtime_deck_forever": 0,
+        "playtime_disconnected": 0,
+        "playtime_forever": 1000,
+        "playtime_linux_forever": 0,
+        "playtime_mac_forever": 0,
+        "playtime_windows_forever": 0,
+        "rtime_last_played": 0
+      },
+      {
+        "appid": 9876,
+        "playtime_deck_forever": 0,
+        "playtime_disconnected": 0,
+        "playtime_forever": 10000,
+        "playtime_linux_forever": 0,
+        "playtime_mac_forever": 0,
+        "playtime_windows_forever": 0,
+        "rtime_last_played": 1709273104
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "applist": {
+    "apps": [
+      {
+        "appid": 666,
+        "name": "Game Buying Simulator 2024"
+      },
+      {
+        "appid": 1337,
+        "name": "Final Fantasy MMLXVII"
+      },
+      {
+        "appid": 654321,
+        "name": "Paint Drying Tycoon 2"
+      }
+    ]
+  }
+}

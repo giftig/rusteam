@@ -118,7 +118,7 @@ pub struct NotedGame {
 
 /// Represents a cleaner / simplified version of SteamOwnedGame to hold playtime details
 // TODO: Consider replacing SteamOwnedGame with this model and deserialising directly into it
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct SteamPlaytime {
     #[serde(flatten)]
     pub id: GameId,

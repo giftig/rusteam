@@ -33,7 +33,7 @@ pub struct SteamApplist {
     pub apps: Vec<SteamAppIdPair>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct SteamAppIdPair {
     pub appid: u32,
     pub name: String
