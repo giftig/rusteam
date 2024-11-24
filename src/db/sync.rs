@@ -42,12 +42,7 @@ impl Sync {
         steam: Box<dyn SteamHandling>,
         notion: Box<dyn NotionHandling>,
     ) -> Sync {
-        Sync {
-            steam_account_id: steam_account_id.to_string(),
-            repo: repo,
-            steam: steam,
-            notion: notion
-        }
+        Sync { steam_account_id: steam_account_id.to_string(), repo, steam, notion }
     }
 }
 
