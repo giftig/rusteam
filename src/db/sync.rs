@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use thiserror::Error;
 
 use crate::db::repo::*;
@@ -20,7 +20,13 @@ pub enum SyncError {
 }
 
 pub enum SyncEvent {
-    ReleaseDateUpdated { game: GameId, prev: String, updated: String },
+    ReleaseDateUpdated {
+        game: GameId,
+        prev_text: String,
+        prev_date: Option<DateTime<Utc>>,
+        new_text: String,
+        new_date: Option<DateTime<Utc>>
+    },
     Released { game: GameId },
 }
 
@@ -86,8 +92,9 @@ impl Sync {
         Ok(())
     }
 
-    // Check if updated game details entries contain a change to release dates and
-    // notify via the log what these changes were
+    /// Check if updated game details entries contain a change to release dates and
+    /// notify via the log what these changes were
+    /// N.B. These changes will also be written into the release_update table
     async fn check_updated_release_dates(&self, games: &[&GameDetails]) -> Result<Vec<SyncEvent>> {
         println!("Checking for updated release dates...");
 
@@ -102,13 +109,20 @@ impl Sync {
                     // as currently the actual release notifications will only affected noted
                     // games, not wishlisted ones.
                     if prev != curr {
-                        updates.push(
-                            SyncEvent::ReleaseDateUpdated {
-                                game: g.id.clone(),
-                                prev: prev.clone(),
-                                updated: curr.clone()
-                            }
-                        );
+                        let prev_date = conv::parse_release_date(&prev);
+                        let new_date = conv::parse_release_date(&curr);
+
+                        self.repo.insert_release_update(&g.id, &prev, &prev_date, &curr, &new_date)
+                            .await?;
+
+                        let event = SyncEvent::ReleaseDateUpdated {
+                            game: g.id.clone(),
+                            prev_text: prev.clone(),
+                            prev_date,
+                            new_text: curr.clone(),
+                            new_date
+                        };
+                        updates.push(event);
                     }
                 _ =>
                     ()

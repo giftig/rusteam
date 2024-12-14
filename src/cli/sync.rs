@@ -67,7 +67,7 @@ impl SyncReport {
             // N.B. I don't use Display because this needs to be updated to first resolve app_id
             // by running a query, anyway; Display won't have sufficient context.
             match e {
-                SyncEvent::ReleaseDateUpdated { game, prev, updated } => {
+                SyncEvent::ReleaseDateUpdated { game, prev_text, new_text, .. } => {
                     let name = {
                         names_by_id
                             .get(&game)
@@ -76,7 +76,8 @@ impl SyncReport {
                     };
 
                     println!(
-                        "🔎 Release date changed for {}: \"{}\" -> \"{}\"", &name, &prev, &updated
+                        "🔎 Release date changed for {}: \"{}\" -> \"{}\"",
+                        &name, &prev_text, &new_text
                     )
                 },
                 SyncEvent::Released { game } => {

@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::num::TryFromIntError;
 use std::time::Duration;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use thiserror::Error;
 use tokio_postgres::{Client, Error as PgError};
@@ -100,6 +100,17 @@ pub trait NotedGamesHandling {
 pub trait WishlistHandling {
     async fn update_wishlist(&self, items: &[WishlistedGame]) -> Result<()>;
     async fn get_upcoming_wishlisted_game_ids(&self) -> Result<Vec<GameId>>;
+}
+
+pub trait ReleaseUpdateHandling {
+    async fn insert_release_update(
+        &self,
+        game: &GameId,
+        prev_text: &str,
+        prev_date: &Option<DateTime<Utc>>,
+        new_text: &str,
+        new_date: &Option<DateTime<Utc>>
+    ) -> Result<()>;
 }
 
 impl SteamGamesHandling for Repo {
@@ -502,5 +513,38 @@ impl WishlistHandling for Repo {
                 .map(|row| GameId::from(row.get::<usize, i64>(0)))
                 .collect()
         )
+    }
+}
+
+impl ReleaseUpdateHandling for Repo {
+    async fn insert_release_update(
+        &self,
+        game: &GameId,
+        prev_text: &str,
+        prev_date: &Option<DateTime<Utc>>,
+        new_text: &str,
+        new_date: &Option<DateTime<Utc>>
+    ) -> Result<()> {
+        let q = r#"
+            INSERT INTO release_update (
+                app_id, prev_text, new_text, prev_estimate, new_estimate, recorded
+            )
+            VALUES ($1, $2, $3, $4, $5, $6);
+        "#;
+        let now = Utc::now().naive_utc();
+
+        self.db
+            .execute(
+                q,
+                &[
+                    &Into::<i64>::into(game.clone()),
+                    &prev_text.to_string(),
+                    &new_text.to_string(),
+                    &prev_date.map(|d| d.naive_utc()),
+                    &new_date.map(|d| d.naive_utc()),
+                    &now,
+                ]
+            ).await?;
+        Ok(())
     }
 }

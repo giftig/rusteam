@@ -26,7 +26,7 @@ type Result<T> = std::result::Result<T, ConvError>;
 // - Attempt to parse exact dates from the human-readable format given
 // - Treat month or years as the last day in that month / year
 // - Treat "coming soon", "to be announced" etc. as unknown
-fn parse_release_date(s: &str) -> Option<DateTime<Utc>> {
+pub fn parse_release_date(s: &str) -> Option<DateTime<Utc>> {
     if s == "To be announced" || s == "Coming soon" {
         return None;
     }
