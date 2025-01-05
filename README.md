@@ -40,16 +40,17 @@ them would be to provide a cookie from a valid login session. Retrieving such a 
 to be unreliable given Steam uses MFA and doesn't encourage scraping its web APIs.
 
 Currently the `import-wishlist` command just supports syncing wishlist data to the `wishlist`
-table for a provided `wishlist.json` file, and you'll need to fetch that file yourself.
+table for a provided `userdata` file, and you'll need to fetch that file yourself.
 
-The easiest way to do this is:
+A previous iteration of this command fetched data from `/wishlist/profiles/<id>/wishlistdata/`
+but this API has since been removed and the new version on the steam website uses a streaming
+protobuf format which is (probably intentionally) a lot less friendly to being scraped.
+
+Instead we rely on a userdata, which can be manually retrieved and imported:
   1. Log in to steam
-  2. Go to your wishlist page: `https://store.steampowered.com/wishlist/id/<username>/`
-  3. In the network tab, look for requests retrieving JSON files; there should only be 2 for
-     this page, one for wishlist and one for general userdata
-  4. Retrieve the payload for the request to `/wishlist/profiles/<id>/wishlistdata/`
+  2. Go to https://store.steampowered.com/dynamicstore/userdata/ and save the JSON data
 
-You can then import the wishlist with `rusteam import-wishlist -f wishlist.json`.
+You can then import the wishlist with `rusteam import-wishlist -f userdata.json`.
 
 ## Queries
 

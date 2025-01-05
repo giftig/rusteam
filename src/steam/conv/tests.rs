@@ -182,29 +182,16 @@ fn parse_release_date_quarter() {
 #[test]
 fn extract_wishlist_valid() {
     let fixture = {
-        let filename = "test/fixtures/wishlist/wishlist-1.json";
+        let filename = "test/fixtures/wishlist/userdata-1.json";
         serde_json::from_str(&fs::read_to_string(&filename).unwrap()).unwrap()
     };
 
     let expected = vec![
-        WishlistedGame {
-            id: GameId { app_id: 1093810 },
-            wishlisted: Utc.with_ymd_and_hms(2019, 10, 11, 6, 24, 8).unwrap(),
-            deleted: None,
-        },
-        WishlistedGame {
-            id: GameId { app_id: 1125510 },
-            wishlisted: Utc.with_ymd_and_hms(2024, 2, 9, 8, 26, 41).unwrap(),
-            deleted: None,
-        },
-        WishlistedGame {
-            id: GameId { app_id: 1145350 },
-            wishlisted: Utc.with_ymd_and_hms(2023, 12, 6, 7, 48, 49).unwrap(),
-            deleted: None,
-        },
+        GameId { app_id: 1093810 },
+        GameId { app_id: 1125510 },
+        GameId { app_id: 1145350 },
     ];
-    let mut actual = extract_wishlist(&fixture).unwrap();
-    actual.sort_by_key(|item| item.id.app_id);
+    let actual = extract_wishlist(&fixture).unwrap();
 
     assert_eq!(actual, expected);
 }

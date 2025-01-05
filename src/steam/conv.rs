@@ -7,7 +7,7 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Months, TimeZone, Ut
 use serde_json;
 use thiserror::Error;
 
-use crate::models::game::{GameId, GameDetails, WishlistedGame};
+use crate::models::game::{GameId, GameDetails};
 use crate::models::steam::SteamAppDetails;
 
 // "Multiplayer", "Co-op", "Online Co-op", "LAN Co-op" categories
@@ -103,34 +103,24 @@ pub(super) fn extract_game_details(
     }
 }
 
-/// Extract a wishlist from raw JSON data; this will be an object with appids as keys
-pub(crate) fn extract_wishlist(v: &serde_json::Value) -> Result<Vec<WishlistedGame>> {
+/// Extract a wishlist from raw JSON userdata; this will contain an rgWishlist key listing appids
+pub(crate) fn extract_wishlist(v: &serde_json::Value) -> Result<Vec<GameId>> {
     let m = v.as_object().ok_or(ConvError("Expected JSON object at root level".to_string()))?;
 
     m
+        .get("rgWishlist")
+        .ok_or(ConvError("missing rgWishlist field in userdata".to_string()))?
+        .as_array()
+        .ok_or(ConvError("Expected JSON array for rgWishlist".to_string()))?
         .into_iter()
-        .map(|(k, v)| {
-            let id: GameId = {
-                k.as_str().try_into()
-                    .map_err(|_| ConvError(format!("Failed to convert appid {}", &k)))?
-            };
+        .map(|entry: &serde_json::Value| {
+            let id: u32 = entry
+                .as_u64()
+                .ok_or(ConvError("appid in rgWishlist could not be converted to u64".to_string()))?
+                .try_into()
+                .map_err(|_| ConvError("appid in rgWishlist was too big to fit into u32!".to_string()))?;
 
-            let wishlisted: i64 = {
-                v.get("added")
-                    .ok_or(ConvError("Missing added field".to_string()))?
-                    .as_number()
-                    .ok_or(ConvError("Expected unix timestamp for added field".to_string()))?
-                    .as_i64()
-                    .ok_or(ConvError("Non-i64 unix timestamp for added field".to_string()))?
-            };
-
-            let ts = {
-                Utc.timestamp_opt(wishlisted, 0)
-                    .single()
-                    .ok_or(ConvError("Bad unix timestamp for added field".to_string()))?
-            };
-
-            Ok(WishlistedGame { id: id, wishlisted: ts, deleted: None })
+            Ok(GameId::from(id))
         })
         .collect()
 }

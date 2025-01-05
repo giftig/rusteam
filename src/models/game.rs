@@ -135,14 +135,6 @@ pub struct PlayedGame {
     pub recorded: DateTime<Utc>,
 }
 
-/// Represents a record in the wishlist table, matching the steam wishlist
-#[derive(Clone, Debug, PartialEq)]
-pub struct WishlistedGame {
-    pub id: GameId,
-    pub wishlisted: DateTime<Utc>,
-    pub deleted: Option<DateTime<Utc>>,
-}
-
 /// Represents a record in the game_details table
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct GameDetails {
