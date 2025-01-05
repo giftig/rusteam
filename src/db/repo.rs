@@ -442,7 +442,7 @@ impl Repo {
 
     async fn delete_wishlist_ids(&self, ids: &[&GameId]) -> Result<()> {
         let now = Utc::now().naive_utc();
-        let q = r#"UPDATE wishlist SET deleted = NOW() WHERE app_id = ANY ($1)"#;
+        let q = r#"UPDATE wishlist SET deleted = $2 WHERE app_id = ANY ($1)"#;
 
         self.db
             .execute(
