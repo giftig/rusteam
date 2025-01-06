@@ -1,9 +1,6 @@
 use super::*;
 
-use std::fs;
-
 use chrono::{TimeZone, Utc};
-use serde_json;
 
 use crate::models::game::{GameId, GameDetails};
 use crate::models::steam::*;
@@ -177,21 +174,4 @@ fn parse_release_date_quarter() {
     let actual = parse_release_date("Q2 2025");
 
     assert_eq!(actual, Some(expected));
-}
-
-#[test]
-fn extract_wishlist_valid() {
-    let fixture = {
-        let filename = "test/fixtures/wishlist/userdata-1.json";
-        serde_json::from_str(&fs::read_to_string(&filename).unwrap()).unwrap()
-    };
-
-    let expected = vec![
-        GameId { app_id: 1093810 },
-        GameId { app_id: 1125510 },
-        GameId { app_id: 1145350 },
-    ];
-    let actual = extract_wishlist(&fixture).unwrap();
-
-    assert_eq!(actual, expected);
 }

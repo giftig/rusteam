@@ -1,5 +1,4 @@
 mod sync;
-mod wishlist;
 
 use clap::Parser;
 
@@ -8,14 +7,12 @@ use clap::Parser;
 #[command(version = "0.1.0")]
 enum Cli {
     Sync(sync::RunSync),
-    ImportWishlist(wishlist::ImportFromFile),
 }
 
 impl Cli {
     async fn run(&self) {
         match self {
             Self::Sync(cmd) => cmd.run().await,
-            Self::ImportWishlist(cmd) => cmd.run().await.unwrap(),
         }
     }
 }

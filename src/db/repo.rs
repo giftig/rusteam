@@ -98,7 +98,7 @@ pub trait NotedGamesHandling {
 }
 
 pub trait WishlistHandling {
-    async fn update_wishlist(&self, items: &[GameId]) -> Result<()>;
+    async fn update_wishlist(&self, items: &[WishlistedGame]) -> Result<()>;
     async fn get_upcoming_wishlisted_game_ids(&self) -> Result<Vec<GameId>>;
 }
 
@@ -457,19 +457,16 @@ impl Repo {
         Ok(())
     }
 
-    async fn insert_wishlist_items(&self, ids: &[GameId]) -> Result<()> {
-        let now = Utc::now().naive_utc();
-
+    async fn insert_wishlist_items(&self, items: &[WishlistedGame]) -> Result<()> {
         // If an item was deleted and readded, unmark as deleted but keep original add date
-        // Since wishlist.json is no longer available, we can only take now as wishlisted date
         let q = r#"
             INSERT INTO wishlist (app_id, wishlisted) VALUES ($1, $2)
             ON CONFLICT (app_id) DO UPDATE SET deleted = NULL
         "#;
 
-        for id in ids {
+        for item in items {
             self.db
-                .execute(q, &[&Into::<i64>::into(id.clone()), &now])
+                .execute(q, &[&Into::<i64>::into(item.id.clone()), &item.wishlisted.naive_utc()])
                 .await?;
         }
         Ok(())
@@ -479,9 +476,9 @@ impl Repo {
 impl WishlistHandling for Repo {
     /// Sync the wishlist by marking removed items as deleted and then inserting missing items
     // TODO: it'd be best to do this transactionally, see link above
-    async fn update_wishlist(&self, ids: &[GameId]) -> Result<()> {
+    async fn update_wishlist(&self, items: &[WishlistedGame]) -> Result<()> {
         let existing_ids = self.get_wishlisted_ids().await?;
-        let new_ids: HashSet<GameId> = ids.iter().map(|id| id.clone()).collect();
+        let new_ids: HashSet<GameId> = items.iter().map(|item| item.id.clone()).collect();
         let remove_ids: Vec<&GameId> = existing_ids.difference(&new_ids).collect();
 
         println!("Marking {} wishlist items as deleted...", remove_ids.len());
@@ -489,8 +486,8 @@ impl WishlistHandling for Repo {
             self.delete_wishlist_ids(&remove_ids).await?;
         }
 
-        let new_items: Vec<GameId> = {
-            ids.iter().cloned().filter(|id| !existing_ids.contains(&id)).collect()
+        let new_items: Vec<WishlistedGame> = {
+            items.iter().cloned().filter(|item| !existing_ids.contains(&item.id)).collect()
         };
 
         println!("Inserting {} new wishlist items...", new_items.len());

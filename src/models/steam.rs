@@ -59,6 +59,22 @@ pub struct SteamAppDetails {
     pub release_date: Option<ReleaseDate>,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct SteamWishlistResponse {
+    pub response: SteamWishlistedGames,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct SteamWishlistedGames {
+    pub items: Vec<SteamWishlistItem>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct SteamWishlistItem {
+    pub appid: u32,
+    pub date_added: i64,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct Category {
     pub id: u32,

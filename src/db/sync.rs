@@ -174,9 +174,15 @@ impl Sync {
         Ok(events)
     }
 
+    async fn sync_wishlist(&mut self) -> Result<()> {
+        let wishlist = self.steam.get_wishlist(&self.steam_account_id)?;
+        Ok(self.repo.update_wishlist(&wishlist).await?)
+    }
+
     pub async fn sync_steam(&mut self) -> Result<Vec<SyncEvent>> {
         self.sync_steam_games().await?;
         self.sync_owned_games().await?;
+        self.sync_wishlist().await?;
         let events = self.sync_game_details().await?;
         self.sync_played_games().await?;
 

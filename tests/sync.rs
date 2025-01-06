@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -11,7 +12,7 @@ use rusteam::db::repo::Repo;
 use rusteam::db::sync::Sync;
 use rusteam::notion::{NotionHandling, Result as NotionResult};
 use rusteam::steam::{Result as SteamResult, *};
-use rusteam::models::game::{GameDetails, GameId, GameState, SteamPlaytime};
+use rusteam::models::game::{GameDetails, GameId, GameState, SteamPlaytime, WishlistedGame};
 use rusteam::models::notion::GameNote;
 use rusteam::models::steam::SteamAppIdPair;
 
@@ -27,6 +28,9 @@ mock! {
     }
     impl SteamAppDetailsHandling for SteamClient {
         fn get_game_details(&self, ids: &[GameId]) -> SteamResult<(Vec<GameDetails>, Vec<GameId>)>;
+    }
+    impl SteamWishlistHandling for SteamClient {
+        fn get_wishlist(&self, account_id: &str) -> Result<Vec<WishlistedGame>>;
     }
     impl SteamHandling for SteamClient {}
 }
@@ -48,6 +52,7 @@ fn steam_app_list_fixture() -> Vec<SteamAppIdPair> {
         SteamAppIdPair { appid: 666, name: "Game Buying Simulator 2024".to_string() },
         SteamAppIdPair { appid: 1337, name: "Final Fantasy MMLXVII".to_string() },
         SteamAppIdPair { appid: 654321, name: "Paint Drying Tycoon 2".to_string() },
+        SteamAppIdPair { appid: 666666, name: "Unearthed Myths 7: The Unearthening".to_string() },
     ]
 }
 
@@ -85,7 +90,19 @@ fn steam_game_details_fixture() -> (Vec<GameDetails>, Vec<GameId>) {
                 release_date: Some("Q3 2077".to_string()),
                 release_estimate: None,
                 recorded: now.clone()
-            }
+            },
+            GameDetails {
+                id: GameId { app_id: 666666 },
+                description: Some("Unearth some unearthenings".to_string()),
+                controller_support: Some("full".to_string()),
+                coop: false,
+                local_coop: false,
+                metacritic_percent: None,
+                is_released: false,
+                release_date: Some("Coming soon".to_string()),
+                release_estimate: None,
+                recorded: now.clone()
+            },
         ],
         vec![]
     )
@@ -98,6 +115,21 @@ fn steam_played_games_fixture() -> Vec<SteamPlaytime> {
             playtime: Duration::new(60 * 60, 0),  // 1h
             last_played: Utc.with_ymd_and_hms(2024, 3, 1, 0, 0, 0).unwrap()
         }
+    ]
+}
+
+fn steam_wishlist_fixture() -> Vec<WishlistedGame> {
+    vec![
+        WishlistedGame {
+            id: GameId { app_id: 666 },
+            wishlisted: Utc.with_ymd_and_hms(2012, 1, 1, 0, 0, 0).unwrap(),
+            deleted: None,
+        },
+        WishlistedGame {
+            id: GameId { app_id: 666666 },
+            wishlisted: Utc.with_ymd_and_hms(2013, 1, 1, 0, 0, 0).unwrap(),
+            deleted: None,
+        },
     ]
 }
 
@@ -138,8 +170,25 @@ async fn test_basic_sync() {
         .returning(|_| Ok(steam_owned_games_fixture()));
 
     steam_client
+        .expect_get_wishlist()
+        .with(predicate::eq("STEAMID"))
+        .times(1)
+        .returning(|_| Ok(steam_wishlist_fixture()));
+
+
+    steam_client
         .expect_get_game_details()
-        .with(predicate::eq(steam_owned_games_fixture()))
+        .with(predicate::function(
+            |ids: &[GameId]| {
+                let tracked_games: HashSet<GameId> = {
+                    steam_owned_games_fixture()
+                        .into_iter()
+                        .chain(steam_wishlist_fixture().clone().into_iter().map(|item| item.id))
+                        .collect()
+                };
+                ids.into_iter().cloned().collect::<HashSet<GameId>>() == tracked_games
+            }
+        ))
         .times(1)
         .returning(|_| Ok(steam_game_details_fixture()));
 

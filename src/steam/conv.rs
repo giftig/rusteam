@@ -4,8 +4,6 @@ mod tests;
 use std::collections::HashSet;
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Months, TimeZone, Utc};
-use serde_json;
-use thiserror::Error;
 
 use crate::models::game::{GameId, GameDetails};
 use crate::models::steam::SteamAppDetails;
@@ -15,12 +13,6 @@ const COOP_CAT_IDS: [u32; 4] = [1, 9, 38, 48];
 
 // "Shared/Split Screen Co-op", "Shared/Split Screen" categories
 const LOCAL_COOP_CAT_IDS: [u32; 2] = [39, 24];
-
-#[derive(Error, Debug)]
-#[error("{0}")]
-pub struct ConvError(String);
-
-type Result<T> = std::result::Result<T, ConvError>;
 
 // Make an attempt to parse a release date into a DateTime estimate.
 // - Attempt to parse exact dates from the human-readable format given
@@ -101,26 +93,4 @@ pub(super) fn extract_game_details(
         release_estimate: steam.release_date.as_ref().and_then(|r| parse_release_date(&r.date)),
         recorded: now.clone(),
     }
-}
-
-/// Extract a wishlist from raw JSON userdata; this will contain an rgWishlist key listing appids
-pub(crate) fn extract_wishlist(v: &serde_json::Value) -> Result<Vec<GameId>> {
-    let m = v.as_object().ok_or(ConvError("Expected JSON object at root level".to_string()))?;
-
-    m
-        .get("rgWishlist")
-        .ok_or(ConvError("missing rgWishlist field in userdata".to_string()))?
-        .as_array()
-        .ok_or(ConvError("Expected JSON array for rgWishlist".to_string()))?
-        .into_iter()
-        .map(|entry: &serde_json::Value| {
-            let id: u32 = entry
-                .as_u64()
-                .ok_or(ConvError("appid in rgWishlist could not be converted to u64".to_string()))?
-                .try_into()
-                .map_err(|_| ConvError("appid in rgWishlist was too big to fit into u32!".to_string()))?;
-
-            Ok(GameId::from(id))
-        })
-        .collect()
 }

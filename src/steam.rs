@@ -3,11 +3,11 @@ pub mod conv;
 use std::collections::HashMap;
 use std::time::Duration;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use thiserror::Error;
 use ureq;
 
-use crate::models::game::{GameDetails, GameId, SteamPlaytime};
+use crate::models::game::{GameDetails, GameId, SteamPlaytime, WishlistedGame};
 use crate::models::steam::*;
 
 #[derive(Error, Debug)]
@@ -16,6 +16,10 @@ pub enum SteamError {
     Http(#[from] ureq::Error),
     #[error("An IO error occurred fetching data from steam: {0}")]
     Io(#[from] std::io::Error),
+    #[error("A JSON decoding error occurred parsing data from steam: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("A data conversion error occurred parsing data from steam: {0}")]
+    Conv(String),
 }
 
 pub type Result<T> = std::result::Result<T, SteamError>;
@@ -33,11 +37,16 @@ pub trait SteamAppDetailsHandling {
     fn get_game_details(&self, ids: &[GameId]) -> Result<(Vec<GameDetails>, Vec<GameId>)>;
 }
 
+pub trait SteamWishlistHandling {
+    fn get_wishlist(&self, account_id: &str) -> Result<Vec<WishlistedGame>>;
+}
+
 
 pub trait SteamHandling:
     SteamPlayerServiceHandling +
     SteamAppsServiceHandling +
-    SteamAppDetailsHandling {}
+    SteamAppDetailsHandling +
+    SteamWishlistHandling {}
 
 pub struct SteamClient {
     api_key: String,
@@ -157,6 +166,39 @@ impl SteamAppDetailsHandling for SteamClient {
                 failures
             )
         )
+    }
+}
+
+impl SteamWishlistHandling for SteamClient {
+    fn get_wishlist(&self, account_id: &str) -> Result<Vec<WishlistedGame>> {
+        let req = ureq::get(&format!("{}/IWishlistService/GetWishlist/v1/", self.api_host))
+            .query("key", &self.api_key)
+            .query("steamid", &account_id);
+
+        let res = req.call()?.into_json::<SteamWishlistResponse>()?;
+
+        res
+            .response
+            .items
+            .into_iter()
+            .map(|item| {
+                Ok(
+                    WishlistedGame {
+                        id: GameId::from(item.appid),
+                        wishlisted:
+                            Utc
+                                .timestamp_opt(item.date_added, 0)
+                                .single()
+                                .ok_or(
+                                    SteamError::Conv(
+                                        "Bad unix timestamp for date_added field".to_string()
+                                    )
+                                )?,
+                        deleted: None,
+                    }
+                )
+            })
+            .collect()
     }
 }
 
