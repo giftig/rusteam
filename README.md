@@ -33,25 +33,6 @@ notifications are:
     string into an actual timestamp to allow sorting by the field. See
     `steam::conv::parse_release_date`.
 
-#### Import wishlist
-
-Wishlist APIs are not made public by Steam, so for private wishlists the only way of scraping
-them would be to provide a cookie from a valid login session. Retrieving such a cookie is likely
-to be unreliable given Steam uses MFA and doesn't encourage scraping its web APIs.
-
-Currently the `import-wishlist` command just supports syncing wishlist data to the `wishlist`
-table for a provided `userdata` file, and you'll need to fetch that file yourself.
-
-A previous iteration of this command fetched data from `/wishlist/profiles/<id>/wishlistdata/`
-but this API has since been removed and the new version on the steam website uses a streaming
-protobuf format which is (probably intentionally) a lot less friendly to being scraped.
-
-Instead we rely on a userdata, which can be manually retrieved and imported:
-  1. Log in to steam
-  2. Go to https://store.steampowered.com/dynamicstore/userdata/ and save the JSON data
-
-You can then import the wishlist with `rusteam import-wishlist -f userdata.json`.
-
 ## Queries
 
 Some useful queries for analysing upcoming games, recently-played games, and other interesting
