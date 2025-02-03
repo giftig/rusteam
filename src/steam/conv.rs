@@ -60,7 +60,12 @@ pub fn parse_release_date(s: &str) -> Option<DateTime<Utc>> {
     // Look for month and year like "Mar 2025". Unfortunately chrono doesn't help us much
     // here because it refuses to parse an imprecise date like this even into a NaiveDate, so we'll
     // try sticking a 1 before it and parsing it as above, then adding a month.
-    if let Ok(d) = NaiveDate::parse_from_str(&format!("1 {}", &clean), "%d %b %Y") {
+    let month_input = format!("1 {}", &clean);
+    let month_res = {
+        NaiveDate::parse_from_str(&month_input, "%d %b %Y")
+            .or_else(|_| NaiveDate::parse_from_str(&month_input, "%d %B %Y"))
+    };
+    if let Ok(d) = month_res {
         let dt = NaiveDateTime::new(d + Months::new(1), NaiveTime::from_hms_opt(0, 0, 0)?);
         return Some(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
     }

@@ -169,6 +169,27 @@ fn parse_release_date_month_year() {
 }
 
 #[test]
+fn parse_release_date_full_month_name_year() {
+    let inputs = vec![
+        "April 1999",
+        "December 2001",
+        "June 2025",
+        "October 2077",
+    ];
+    let expectations = vec![
+        Utc.with_ymd_and_hms(1999, 5, 1, 0, 0, 0).unwrap(),
+        Utc.with_ymd_and_hms(2002, 1, 1, 0, 0, 0).unwrap(),
+        Utc.with_ymd_and_hms(2025, 7, 1, 0, 0, 0).unwrap(),
+        Utc.with_ymd_and_hms(2077, 11, 1, 0, 0, 0).unwrap(),
+    ];
+
+    for (input, &expected) in inputs.iter().zip(expectations.iter()) {
+        let actual = parse_release_date(&input);
+        assert_eq!(actual, Some(expected), "should parse \"{}\" correctly", input)
+    }
+}
+
+#[test]
 fn parse_release_date_quarter() {
     let expected = Utc.with_ymd_and_hms(2025, 7, 1, 0, 0, 0).unwrap();
     let actual = parse_release_date("Q2 2025");
