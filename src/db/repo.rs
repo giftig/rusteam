@@ -113,6 +113,10 @@ pub trait ReleaseUpdateHandling {
     ) -> Result<()>;
 }
 
+pub trait IgnoredGamesHandling {
+    async fn insert_ignored_games(&self, ids: &[GameId]) -> Result<()>;
+}
+
 impl SteamGamesHandling for Repo {
     async fn insert_steam_games<T: AsRef<str>>(&self, games: HashMap<u32, T>) -> Result<()> {
         let ids: HashSet<u32> = games.keys().cloned().collect();
@@ -545,6 +549,20 @@ impl ReleaseUpdateHandling for Repo {
                     &now,
                 ]
             ).await?;
+        Ok(())
+    }
+}
+
+impl IgnoredGamesHandling for Repo {
+    async fn insert_ignored_games(&self, ids: &[GameId]) -> Result<()> {
+        let q = r#"
+            INSERT INTO ignored_game(app_id) VALUES ($1)
+            ON CONFLICT DO NOTHING
+        "#;
+
+        for id in ids {
+            self.db.execute(q, &[&Into::<i64>::into(id.clone())]).await?;
+        }
         Ok(())
     }
 }
