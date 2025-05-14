@@ -2,6 +2,7 @@
 -- Prioritise those which were wishlisted prior to release, in theory these
 -- are ones which were being eagerly awaited once upon a time?
 SELECT
+  w.app_id,
   sg.name,
   w.wishlisted,
   gd.release_date,
@@ -14,7 +15,8 @@ FROM
   LEFT JOIN owned_game og ON w.app_id = og.app_id
 WHERE
   gd.is_released = TRUE AND
-  og.app_id IS NULL
+  og.app_id IS NULL AND
+  w.deleted IS NULL
 ORDER BY
   wishlisted_before_release DESC,
   w.wishlisted DESC

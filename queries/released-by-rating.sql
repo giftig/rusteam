@@ -20,9 +20,11 @@ FROM
   LEFT JOIN game_details gd ON ng.app_id = gd.app_id
   LEFT JOIN owned_game og ON ng.app_id = og.app_id
   LEFT JOIN played p ON ng.app_id = p.app_id
+  LEFT JOIN ignored_game ig ON ng.app_id = ig.app_id
 WHERE
   gd.is_released AND
-  p.playtime <= '0:30'
+  p.playtime <= '0:30' AND
+  ig.app_id IS NULL
 ORDER BY
   ng.my_rating DESC NULLS LAST,
   name
