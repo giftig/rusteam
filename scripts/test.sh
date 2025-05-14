@@ -11,7 +11,7 @@ export COMPOSE_FILE=docker-compose-test.yaml
 docker compose up -d
 await_service test_db 'ready to accept connections'
 
-cargo test || {
+cargo llvm-cov || {
   echo 'Leaving test database running to aid debugging' >&1
   exit "$?"
 }
