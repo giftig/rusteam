@@ -37,7 +37,7 @@ async fn test_ignore_game() {
     let db_client = db::connect(&conf.db.connection_string()).await;
 
     let actual: HashSet<u32> = get_ignored_games(&db_client).await;
-    let expected: HashSet<u32> = vec![123, 456].into_iter().collect();
+    let expected: HashSet<u32> = HashSet::from([123, 456]);
 
     assert_eq!(actual, expected);
 }

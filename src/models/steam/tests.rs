@@ -24,7 +24,7 @@ fn read_steam_app_details_response() {
         }
     };
     let expected_entries: HashMap<String, SteamAppDetailsResponseEntry> = {
-        vec![("413150".to_string(), expected_entry)].into_iter().collect()
+        HashMap::from([("413150".to_string(), expected_entry)])
     };
 
     let expected = SteamAppDetailsResponse { results: expected_entries };
