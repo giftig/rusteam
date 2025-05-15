@@ -1,5 +1,5 @@
-mod ignore;
-mod sync;
+pub mod ignore;
+pub mod sync;
 
 use clap::Parser;
 

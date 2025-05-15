@@ -1,0 +1,17 @@
+[db]
+host = "localhost"
+port = "15432"
+user = "tests"
+password = "test_admin"
+dbname = "rusteam_test"
+
+[steam]
+api_key = "STEAM API KEY"
+api_hoststring = "localhost:6666"
+store_hoststring = "localhost:6666"
+user_id = "STEAMID"
+
+[notion]
+api_key = "NOTION API KEY"
+database_id = "NOTION DB ID"
+api_hoststring = "localhost:7777"

@@ -10,16 +10,16 @@ use crate::models::game::GameId;
 #[derive(Debug, Parser)]
 pub struct RunIgnoreGame {
     #[arg(short, long)]
-    config_file: Option<PathBuf>,
+    pub config_file: Option<PathBuf>,
     #[arg(
       short, long, required = true, num_args = 1.., value_delimiter = ',',
       help = "App IDs to ignore (comma-separated)"
     )]
-    games: Vec<String>,
+    pub games: Vec<String>,
 }
 
 impl RunIgnoreGame {
-    pub(super) async fn run(&self) {
+    pub async fn run(&self) {
         let conf = config::read(self.config_file.as_ref());
         let mut db_client = db::connect(&conf.db.connection_string()).await;
         db::migrate(&mut db_client).await;
