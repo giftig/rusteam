@@ -71,6 +71,9 @@ impl Sync {
     }
 
     async fn sync_played_games(&self) -> Result<()> {
+        // FIXME: We should cache the result of get_owned_games from when we synced those and
+        // reuse that rather than making an API call here (might make most sense to do it on the
+        // client)
         let playtime_steam = self.steam.get_played_games(&self.steam_account_id)?;
         let now = Utc::now();
 

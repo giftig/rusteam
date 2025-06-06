@@ -209,7 +209,7 @@ impl GameDetailsHandling for Repo {
 
         let mut row_count: u64 = 0;
 
-        println!("Inserting {} game details into owned_game table", details.len());
+        println!("Inserting {} game details into game_details table", details.len());
         for d in details {
             let res = self.db
                 .execute(
