@@ -202,8 +202,8 @@ impl GameDetailsHandling for Repo {
                     local_coop = excluded.local_coop,
                     metacritic_percent = excluded.metacritic_percent,
                     is_released = excluded.is_released,
-                    release_date = excluded.release_date,
-                    release_estimate = excluded.release_estimate,
+                    release_date = COALESCE(excluded.release_date, NULLIF(excluded.release_date, ''), game_details.release_date),
+                    release_estimate = COALESCE(excluded.release_estimate, game_details.release_estimate),
                     recorded = excluded.recorded
         "#;
 
