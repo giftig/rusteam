@@ -390,7 +390,9 @@ impl NotedGamesHandling for Repo {
         let q = r#"
             SELECT ng.app_id
             FROM noted_game ng LEFT JOIN game_details gd ON ng.app_id = gd.app_id
-            WHERE gd.is_released = FALSE
+            WHERE
+                gd.is_released = FALSE OR
+                gd.release_estimate IS NOT NULL AND gd.release_estimate > NOW()
         "#;
 
         Ok(
@@ -507,7 +509,9 @@ impl WishlistHandling for Repo {
         let q = r#"
             SELECT w.app_id
             FROM wishlist w LEFT JOIN game_details gd ON w.app_id = gd.app_id
-            WHERE gd.is_released = FALSE
+            WHERE
+                gd.is_released = FALSE OR
+                gd.release_estimate IS NOT NULL AND gd.release_estimate > NOW()
         "#;
 
         Ok(
